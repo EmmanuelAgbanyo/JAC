@@ -18,6 +18,8 @@ const UserForm = ({ onSubmit, onCancel, initialData }: { onSubmit: (user: User) 
         password: '',
         role: initialData?.role || Role.STAFF,
     });
+    
+    const isEditingSuperAdmin = initialData?.role === Role.SUPER_ADMIN;
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -45,6 +47,10 @@ const UserForm = ({ onSubmit, onCancel, initialData }: { onSubmit: (user: User) 
         .filter(role => role !== Role.SUPER_ADMIN) // Cannot create other super admins
         .map(role => ({ value: role, label: role }));
 
+    if (isEditingSuperAdmin) {
+        roleOptions.unshift({ value: Role.SUPER_ADMIN, label: Role.SUPER_ADMIN });
+    }
+
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
             <Input
@@ -69,6 +75,7 @@ const UserForm = ({ onSubmit, onCancel, initialData }: { onSubmit: (user: User) 
                 value={formData.role}
                 onChange={(e) => setFormData({ ...formData, role: e.target.value as Role })}
                 required
+                disabled={isEditingSuperAdmin}
             />
             <div className="flex justify-end space-x-3 pt-4 border-t">
                 <Button variant="secondary" onClick={onCancel}>Cancel</Button>
@@ -126,11 +133,9 @@ const UserManagement = ({ allUsers, onSaveUser, onDeleteUser }: UserManagementPr
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{user.username}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.role}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                                        <Button variant="info" size="sm" onClick={() => handleOpenModal(user)}>Edit</Button>
                                         {user.role !== Role.SUPER_ADMIN && (
-                                            <>
-                                                <Button variant="info" size="sm" onClick={() => handleOpenModal(user)}>Edit</Button>
-                                                <Button variant="danger" size="sm" onClick={() => handleDeleteUser(user.id)}>Delete</Button>
-                                            </>
+                                            <Button variant="danger" size="sm" onClick={() => handleDeleteUser(user.id)}>Delete</Button>
                                         )}
                                     </td>
                                 </tr>

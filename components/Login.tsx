@@ -102,7 +102,7 @@ const Login = ({ onLogin, entrepreneurs, users }: LoginProps) => {
                   label="Password"
                   id="password"
                   type="password"
-                  placeholder="Default: password123"
+                  placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />

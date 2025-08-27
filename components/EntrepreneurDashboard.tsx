@@ -390,7 +390,13 @@ const EntrepreneurDashboard = ({ entrepreneur, transactions, navigateTo, onEditT
                                     <li key={t.id} className="py-3 flex justify-between items-start">
                                         <div className="flex-grow">
                                             <p className="font-medium text-gray-800 dark:text-dark-text">{t.description}</p>
-                                            <p className="text-sm text-gray-500 dark:text-dark-textSecondary">{new Date(t.date).toLocaleDateString()}</p>
+                                            <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-dark-textSecondary">
+                                                <span>{new Date(t.date).toLocaleDateString()}</span>
+                                                <span>&bull;</span>
+                                                <span className={`font-semibold ${t.type === TransactionType.INCOME ? 'text-green-600' : 'text-red-600'}`}>
+                                                    {t.type}
+                                                </span>
+                                            </div>
                                         </div>
                                         <div className="text-right flex-shrink-0 ml-4">
                                             <p className={`font-semibold text-lg ${t.type === TransactionType.INCOME ? 'text-green-600' : 'text-red-600'}`}>
