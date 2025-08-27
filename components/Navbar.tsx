@@ -29,8 +29,8 @@ const Navbar = ({ currentUser, navigateTo, onLogout, onExport, onImport, onAskAi
     return currentUser.user.name;
   };
   
-  const canImportExport = currentUser.type === 'system' && [Role.SUPER_ADMIN, Role.ADMIN].includes(currentUser.user.role);
-  const canAskAi = currentUser.type === 'system' && [Role.SUPER_ADMIN, Role.ADMIN].includes(currentUser.user.role);
+  const canImportExport = currentUser.type === 'system' && [Role.SUPER_ADMIN, Role.ADMIN, Role.STAFF].includes(currentUser.user.role);
+  const canAskAi = currentUser.type === 'system' && [Role.SUPER_ADMIN, Role.ADMIN, Role.STAFF].includes(currentUser.user.role);
 
   const renderNavLinks = () => (
     <div className="flex flex-col md:flex-row items-stretch md:items-center md:space-x-4">

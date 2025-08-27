@@ -492,25 +492,20 @@ const AppContent = () => {
   // --- Data Scoping ---
   const visibleEntrepreneurs = useCallback(() => {
     if (currentUser?.type === 'system') {
-        if (currentUser.user.role === Role.STAFF) {
-            return entrepreneurs.filter(e => e.assignedStaffId === currentUser.user.id);
-        }
-        return entrepreneurs; // Super Admin and Admin see all
+        // Super Admin, Admin, and Staff now see all
+        return entrepreneurs;
     }
     return []; // Entrepreneurs don't see lists of other entrepreneurs
   }, [currentUser, entrepreneurs]);
 
   const visibleTransactions = useCallback(() => {
     if (currentUser?.type === 'system') {
-        if (currentUser.user.role === Role.STAFF) {
-            const assignedIds = visibleEntrepreneurs().map(e => e.id);
-            return transactions.filter(t => assignedIds.includes(t.entrepreneurId));
-        }
-        return transactions; // Super Admin and Admin see all
+        // Super Admin, Admin, and Staff now see all
+        return transactions;
     }
     // For entrepreneur user, their own transactions are filtered inside their dashboard component
     return transactions.filter(t => t.entrepreneurId === (currentUser as { type: 'entrepreneur', user: Entrepreneur }).user.id);
-  }, [currentUser, transactions, visibleEntrepreneurs]);
+  }, [currentUser, transactions]);
 
 
   const renderSystemUserView = () => {

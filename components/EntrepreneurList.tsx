@@ -39,7 +39,7 @@ const EntrepreneurList = ({ entrepreneurs, onEdit, onDelete, onViewDashboard, us
     return users.find(u => u.id === staffId)?.username || 'Unknown Staff';
   };
 
-  const canManage = [Role.ADMIN, Role.SUPER_ADMIN].includes(currentUser.user.role);
+  const canManage = [Role.ADMIN, Role.SUPER_ADMIN, Role.STAFF].includes(currentUser.user.role);
   
   if (entrepreneurs.length === 0) {
     return <p className="text-center text-gray-500 dark:text-dark-textSecondary py-8">No entrepreneurs found.</p>;
