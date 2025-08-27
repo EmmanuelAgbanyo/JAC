@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AES JAC Admin Portal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            // Core Palette based on dark yellow, green, and blue
+            primary: '#004AAD',     // Professional Blue
+            secondary: '#F3F4F6',   // Light Gray Background (like tailwind gray-100)
+            accent: '#D4A017',      // Dark Yellow (Ochre/Mustard)
+            success: '#28a745',     // Vibrant Green
+            danger: '#dc3545',      // Clear Red
+            info: '#00B8D9',        // Light Blue
+            warning: '#D4A017',     // Use accent for warnings
+
+            // AES Branding aliases for consistency
+            aesBlue: '#004AAD',
+            aesGreen: '#28a745',
+            aesYellow: '#D4A017',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    input[type="date"]::-webkit-calendar-picker-indicator {
+        opacity: 0;
+        cursor: pointer;
+    }
+    @media print {
+      body {
+        -webkit-print-color-adjust: exact; /* Chrome, Safari */
+        color-adjust: exact; /* Firefox */
+      }
+      .no-print {
+        display: none !important;
+      }
+      .print-container {
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        box-shadow: none !important;
+        border: none !important;
+      }
+      .print-page-break {
+        page-break-after: always;
+      }
+      .print-bg-white {
+        background-color: white !important;
+      }
+      .print-text-black {
+        color: black !important;
+      }
+    }
+    /* Styles for the "Ask AI" chat modal */
+    .chat-container::-webkit-scrollbar {
+        width: 6px;
+    }
+    .chat-container::-webkit-scrollbar-track {
+        background: #f1f1f1;
+    }
+    .chat-container::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 3px;
+    }
+    .chat-container::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+  </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.1.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
+    "react/": "https://esm.sh/react@^19.1.0/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.9.0",
+    "recharts": "https://esm.sh/recharts@^3.1.0",
+    "docx": "https://esm.sh/docx@8.5.0",
+    "xlsx": "https://esm.sh/xlsx@0.18.5",
+    "file-saver": "https://esm.sh/file-saver@^2.0.5",
+    "jspdf": "https://esm.sh/jspdf@^3.0.1",
+    "jspdf-autotable": "https://esm.sh/jspdf-autotable@^5.0.2"
+  }
+}
+</script>
+</head>
+<body class="bg-secondary">
+  <div id="root"></div>
+  <script type="module" src="./index.tsx"></script>
+</body>
+</html>
