@@ -14,9 +14,7 @@ interface TransactionListProps {
 const TransactionList = ({ transactions, entrepreneurs, onDeleteTransaction, onEditTransaction }: TransactionListProps) => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  
   const getEntrepreneurName = (id: string) => {
     const entrepreneur = entrepreneurs.find(e => e.id === id);
     return entrepreneur ? entrepreneur.businessName : 'N/A';
@@ -33,16 +31,10 @@ const TransactionList = ({ transactions, entrepreneurs, onDeleteTransaction, onE
   };
 
   const handleDeleteConfirm = () => {
-    if (!transactionToDelete) return;
-
-    setDeletingId(transactionToDelete.id);
-    closeDeleteModal();
-
-    // Wait for animation to complete before removing from state
-    setTimeout(() => {
+    if (transactionToDelete) {
       onDeleteTransaction(transactionToDelete.id);
-      setDeletingId(null);
-    }, 300); // Duration should match the transition duration
+      closeDeleteModal();
+    }
   };
 
   if (transactions.length === 0) {
@@ -54,9 +46,11 @@ const TransactionList = ({ transactions, entrepreneurs, onDeleteTransaction, onE
 
 
   return (
-    <div className="bg-white dark:bg-dark-secondary p-6 rounded-lg shadow-md mt-8">
-      <h2 className="text-xl font-semibold text-gray-800 dark:text-dark-text mb-6">Recent Transactions</h2>
-      <div className="overflow-x-auto">
+    <div className="bg-white dark:bg-dark-secondary p-2 md:p-6 rounded-lg shadow-md mt-8">
+      <h2 className="text-xl font-semibold text-gray-800 dark:text-dark-text mb-6 px-4 md:px-0">Recent Transactions</h2>
+      
+      {/* Table view for larger screens */}
+      <div className="overflow-x-auto hidden md:block">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-dark-border">
           <thead className="bg-gray-50 dark:bg-dark-primary">
             <tr>
@@ -74,13 +68,13 @@ const TransactionList = ({ transactions, entrepreneurs, onDeleteTransaction, onE
             {sortedTransactions.map((t) => (
               <tr 
                 key={t.id} 
-                className={`transition-opacity duration-300 ${deletingId === t.id ? 'opacity-0' : 'hover:bg-gray-50 dark:hover:bg-dark-primary'} ${t.type === TransactionType.INCOME ? 'text-green-500' : 'text-red-500'}`}
+                className={`hover:bg-gray-50 dark:hover:bg-dark-primary`}
               >
-                <td className="px-6 py-4 whitespace-nowrap text-sm dark:text-dark-textSecondary">{new Date(t.date).toLocaleDateString()}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-dark-textSecondary">{new Date(t.date).toLocaleDateString()}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-dark-text">{getEntrepreneurName(t.entrepreneurId)}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">{t.type}</td>
+                <td className={`px-6 py-4 whitespace-nowrap text-sm font-semibold ${t.type === TransactionType.INCOME ? 'text-green-600' : 'text-red-600'}`}>{t.type}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-dark-text max-w-xs truncate" title={t.description}>{t.description}</td>
-                <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-semibold`}>{t.amount.toFixed(2)}</td>
+                <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold ${t.type === TransactionType.INCOME ? 'text-green-600' : 'text-red-600'}`}>{t.amount.toFixed(2)}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-dark-textSecondary">{t.paymentMethod}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-dark-textSecondary">{t.type === TransactionType.INCOME ? t.paidStatus : 'N/A'}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -92,6 +86,32 @@ const TransactionList = ({ transactions, entrepreneurs, onDeleteTransaction, onE
           </tbody>
         </table>
       </div>
+
+      {/* Card view for smaller screens */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:hidden">
+        {sortedTransactions.map(t => (
+          <div key={t.id} className={`bg-gray-50 dark:bg-dark-primary rounded-lg p-4 shadow-sm border-l-4 ${t.type === TransactionType.INCOME ? 'border-green-500' : 'border-red-500'}`}>
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="font-bold text-gray-800 dark:text-dark-text truncate max-w-[150px]" title={t.description}>{t.description}</p>
+                <p className="text-xs text-gray-600 dark:text-dark-textSecondary font-semibold">{getEntrepreneurName(t.entrepreneurId)}</p>
+                <p className="text-xs text-gray-500 dark:text-dark-textSecondary">{new Date(t.date).toLocaleDateString()}</p>
+              </div>
+              <p className={`text-xl font-bold ${t.type === TransactionType.INCOME ? 'text-green-600' : 'text-red-600'}`}>
+                {t.type === TransactionType.INCOME ? '+' : '-'} {t.amount.toFixed(2)}
+              </p>
+            </div>
+            <div className="text-xs text-gray-500 dark:text-dark-textSecondary mt-2 pt-2 border-t dark:border-dark-border">
+              {t.paymentMethod} {t.type === TransactionType.INCOME && `• ${t.paidStatus}`}
+            </div>
+            <div className="flex justify-end space-x-2 mt-3">
+              <Button variant="info" size="sm" onClick={() => onEditTransaction(t)}>Edit</Button>
+              <Button variant="danger" size="sm" onClick={() => openDeleteModal(t)}>Delete</Button>
+            </div>
+          </div>
+        ))}
+      </div>
+
       <Modal
         isOpen={showDeleteModal}
         onClose={closeDeleteModal}

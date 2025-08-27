@@ -30,10 +30,10 @@ const RecentActivity = ({ activities, entrepreneurs }: RecentActivityProps) => {
             return (
                 <div className="flex justify-between items-center w-full">
                     <div>
-                        <p className="font-medium text-gray-800">
+                        <p className="font-medium text-gray-800 dark:text-dark-text">
                            {isIncome ? 'Income' : 'Expense'} from {getEntrepreneurName(t.entrepreneurId)}
                         </p>
-                        <p className="text-xs text-gray-500">{t.description}</p>
+                        <p className="text-xs text-gray-500 dark:text-dark-textSecondary">{t.description}</p>
                     </div>
                     <p className={`font-semibold text-sm ${isIncome ? 'text-green-600' : 'text-red-600'}`}>
                         {isIncome ? '+' : '-'}GHS {t.amount.toFixed(2)}
@@ -45,8 +45,8 @@ const RecentActivity = ({ activities, entrepreneurs }: RecentActivityProps) => {
             const e = activity.data;
             return (
                 <div>
-                     <p className="font-medium text-gray-800">New Entrepreneur Joined</p>
-                     <p className="text-xs text-gray-500">{e.name} ({e.businessName})</p>
+                     <p className="font-medium text-gray-800 dark:text-dark-text">New Entrepreneur Joined</p>
+                     <p className="text-xs text-gray-500 dark:text-dark-textSecondary">{e.name} ({e.businessName})</p>
                 </div>
             );
         }
@@ -54,8 +54,8 @@ const RecentActivity = ({ activities, entrepreneurs }: RecentActivityProps) => {
     }
     
     return (
-        <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-lg font-semibold text-gray-700 mb-4">Recent Activity</h3>
+        <div className="bg-white dark:bg-dark-secondary p-6 rounded-lg shadow-md">
+            <h3 className="text-lg font-semibold text-gray-700 dark:text-dark-text mb-4">Recent Activity</h3>
             {activities.length > 0 ? (
                 <ul className="space-y-4">
                     {activities.map((activity, index) => (
@@ -65,9 +65,9 @@ const RecentActivity = ({ activities, entrepreneurs }: RecentActivityProps) => {
                         </li>
                     ))}
                 </ul>
-            ) : <p className="text-center text-gray-500 py-4">No recent activity in this period.</p>}
+            ) : <p className="text-center text-gray-500 dark:text-dark-textSecondary py-4">No recent activity in this period.</p>}
         </div>
     );
 };
 
-export default RecentActivity;
+export default React.memo(RecentActivity);

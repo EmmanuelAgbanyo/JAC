@@ -1,13 +1,26 @@
 import React, { useState, useEffect, useCallback, type ChangeEvent, useRef } from 'react';
 import { AppView, TransactionType, PaymentMethod, USERS } from './constants';
-import type { Entrepreneur, Transaction, Goal, CurrentUser, User } from './types';
+import type { Entrepreneur, Transaction, Goal, CurrentUser, User, PartialTransaction } from './types';
 import { Role } from './types';
 import Navbar from './components/Navbar';
 import EntrepreneurManager from './components/EntrepreneurManager';
 import TransactionManager from './components/TransactionManager';
 import ReportGenerator from './components/ReportGenerator';
-import { listenToEntrepreneurs, listenToTransactions, saveEntrepreneurs, saveTransactions, listenToUsers, saveUsers } from './services/storageService';
-import { parseTransactionsFromPdf } from './services/geminiService';
+import { 
+  listenToEntrepreneurs, 
+  listenToTransactions, 
+  listenToUsers,
+  writeEntrepreneur,
+  deleteEntrepreneur,
+  writeTransaction,
+  deleteTransaction,
+  writeUser,
+  deleteUser,
+  overwriteEntrepreneurs,
+  overwriteTransactions,
+  overwriteUsers
+} from './services/storageService';
+import { parseTransactionsFromPdf, parseExpenseFromReceipt } from './services/geminiService';
 import Dashboard from './components/Dashboard';
 import EntrepreneurDashboard from './components/EntrepreneurDashboard';
 import GrowthHub from './components/GrowthHub';
@@ -31,6 +44,7 @@ const AppContent = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [editingEntrepreneur, setEditingEntrepreneur] = useState<Entrepreneur | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [scannedTransaction, setScannedTransaction] = useState<PartialTransaction | null>(null);
   const [selectedDashboardEntrepreneur, setSelectedDashboardEntrepreneur] = useState<Entrepreneur | null>(null);
   const [isImporting, setIsImporting] = useState<boolean>(false);
   const [isAskAiModalOpen, setIsAskAiModalOpen] = useState(false);
@@ -50,7 +64,7 @@ const AppContent = () => {
     const unsubscribeUsers = listenToUsers((data) => {
       if (data.length === 0) {
         // First-time setup or data wipe, seed with default users
-        saveUsers(USERS);
+        overwriteUsers(USERS);
         setUsers(USERS);
       } else {
         setUsers(data);
@@ -92,29 +106,12 @@ const AppContent = () => {
     navigateTo(AppView.LOGIN);
   };
 
-  const handleSetUsers = useCallback(async (updatedUsers: User[]) => {
-    setUsers(updatedUsers);
-    await saveUsers(updatedUsers);
-  }, []);
-
-  const handleSetEntrepreneurs = useCallback(async (updatedEntrepreneurs: Entrepreneur[]) => {
-    setEntrepreneurs(updatedEntrepreneurs);
-    await saveEntrepreneurs(updatedEntrepreneurs);
-  }, []);
-
-  const handleSetTransactions = useCallback(async (updatedTransactions: Transaction[]) => {
-    setTransactions(updatedTransactions);
-    await saveTransactions(updatedTransactions);
-  }, []);
-
   const handleDeleteEntrepreneur = useCallback(async (id: string) => {
-    const updatedEntrepreneurs = entrepreneurs.filter(e => e.id !== id);
     const updatedTransactions = transactions.filter(t => t.entrepreneurId !== id);
-    await Promise.all([
-      handleSetEntrepreneurs(updatedEntrepreneurs),
-      handleSetTransactions(updatedTransactions)
-    ]);
-  }, [entrepreneurs, transactions, handleSetEntrepreneurs, handleSetTransactions]);
+    const deletePromises = updatedTransactions.map(t => deleteTransaction(t.id));
+    await Promise.all(deletePromises);
+    await deleteEntrepreneur(id);
+  }, [transactions]);
 
 
   const navigateTo = (view: AppView) => {
@@ -142,10 +139,22 @@ const AppContent = () => {
   const handleCloseEditTransaction = () => {
     setEditingTransaction(null);
   };
+  
+  const handleScanSuccess = (parsedData: PartialTransaction) => {
+    setScannedTransaction(parsedData);
+  };
+
+  const handleCloseScannedTransaction = () => {
+    setScannedTransaction(null);
+  };
+  
+  const handleAddScannedTransaction = async (transaction: Transaction) => {
+      await writeTransaction(transaction);
+      handleCloseScannedTransaction();
+  };
 
   const handleUpdateTransaction = async (updatedTransaction: Transaction) => {
-    const updatedTransactions = transactions.map(t => t.id === updatedTransaction.id ? updatedTransaction : t);
-    await handleSetTransactions(updatedTransactions);
+    await writeTransaction(updatedTransaction);
     handleCloseEditTransaction();
   };
   
@@ -173,8 +182,7 @@ const AppContent = () => {
     }
     updatedEntrepreneur.goals = existingGoals;
 
-    const updatedEntrepreneurs = entrepreneurs.map(e => e.id === updatedEntrepreneur.id ? updatedEntrepreneur : e);
-    await handleSetEntrepreneurs(updatedEntrepreneurs);
+    await writeEntrepreneur(updatedEntrepreneur);
     
     if (selectedDashboardEntrepreneur?.id === updatedEntrepreneur.id) {
         setSelectedDashboardEntrepreneur(updatedEntrepreneur);
@@ -208,9 +216,9 @@ const AppContent = () => {
             if (importedData.entrepreneurs && importedData.transactions) {
                 if (window.confirm("This will overwrite all existing data with the backup file. Are you sure you want to proceed?")) {
                     await Promise.all([
-                      handleSetUsers(importedData.users || USERS), // Handle legacy backups
-                      handleSetEntrepreneurs(importedData.entrepreneurs),
-                      handleSetTransactions(importedData.transactions)
+                      overwriteUsers(importedData.users || USERS), // Handle legacy backups
+                      overwriteEntrepreneurs(importedData.entrepreneurs),
+                      overwriteTransactions(importedData.transactions)
                     ]);
                     alert("Data restored successfully!");
                     navigateTo(AppView.DASHBOARD);
@@ -333,10 +341,9 @@ const AppContent = () => {
 
             if (newTransactions.length > 0) {
                 if (window.confirm(confirmationMessage)) {
-                    await Promise.all([
-                      handleSetEntrepreneurs([...entrepreneurs, ...newlyCreatedEntrepreneurs]),
-                      handleSetTransactions([...transactions, ...newTransactions])
-                    ]);
+                    const entrepreneurPromises = newlyCreatedEntrepreneurs.map(e => writeEntrepreneur(e));
+                    const transactionPromises = newTransactions.map(t => writeTransaction(t));
+                    await Promise.all([...entrepreneurPromises, ...transactionPromises]);
                     alert(`Import complete!\n\nAdded: ${newTransactions.length} transactions.\nCreated: ${newlyCreatedEntrepreneurs.length} entrepreneurs.\nSkipped: ${skippedRows} rows.${errors.length > 0 ? ' See console for details.' : ''}`);
                 }
             } else {
@@ -425,10 +432,9 @@ const AppContent = () => {
 
         if (newTransactions.length > 0) {
             if (window.confirm(confirmationMessage)) {
-                await Promise.all([
-                  handleSetEntrepreneurs([...entrepreneurs, ...newlyCreatedEntrepreneurs]),
-                  handleSetTransactions([...transactions, ...newTransactions])
-                ]);
+                const entrepreneurPromises = newlyCreatedEntrepreneurs.map(e => writeEntrepreneur(e));
+                const transactionPromises = newTransactions.map(t => writeTransaction(t));
+                await Promise.all([...entrepreneurPromises, ...transactionPromises]);
                 alert(`PDF Import complete!\n\nAdded: ${newTransactions.length} transactions.\nCreated: ${newlyCreatedEntrepreneurs.length} entrepreneurs.\nSkipped rows: ${errors.length}.${errors.length > 0 ? ' See console for details.' : ''}`);
             }
         } else {
@@ -502,7 +508,8 @@ const AppContent = () => {
         }
         return transactions; // Super Admin and Admin see all
     }
-    return []; // Logic for entrepreneur's own transactions is handled elsewhere
+    // For entrepreneur user, their own transactions are filtered inside their dashboard component
+    return transactions.filter(t => t.entrepreneurId === (currentUser as { type: 'entrepreneur', user: Entrepreneur }).user.id);
   }, [currentUser, transactions, visibleEntrepreneurs]);
 
 
@@ -519,7 +526,7 @@ const AppContent = () => {
         return (
           <EntrepreneurManager
             entrepreneurs={scopedEntrepreneurs}
-            setEntrepreneurs={handleSetEntrepreneurs}
+            onAddOrUpdateEntrepreneur={writeEntrepreneur}
             editingEntrepreneur={editingEntrepreneur}
             setEditingEntrepreneur={setEditingEntrepreneur}
             currentView={currentView}
@@ -546,9 +553,11 @@ const AppContent = () => {
         return (
           <TransactionManager
             transactions={scopedTransactions}
-            setTransactions={handleSetTransactions}
+            onAddTransaction={writeTransaction}
+            onDeleteTransaction={deleteTransaction}
             entrepreneurs={scopedEntrepreneurs}
             onEditTransaction={handleOpenEditTransaction}
+            onScanSuccess={handleScanSuccess}
           />
         );
       case AppView.REPORTS:
@@ -556,7 +565,7 @@ const AppContent = () => {
       case AppView.GROWTH_HUB:
         return <GrowthHub entrepreneurs={scopedEntrepreneurs} />;
       case AppView.USER_MANAGEMENT:
-        return <UserManagement allUsers={users} setUsers={handleSetUsers} />;
+        return <UserManagement allUsers={users} onSaveUser={writeUser} onDeleteUser={deleteUser} />;
       default:
         return <Dashboard entrepreneurs={scopedEntrepreneurs} transactions={scopedTransactions} />;
     }
@@ -566,9 +575,6 @@ const AppContent = () => {
     if (currentUser?.type !== 'entrepreneur') return null;
 
     const myTransactions = transactions.filter(t => t.entrepreneurId === currentUser.user.id);
-    const handleAddTransaction = async (newTransaction: Transaction) => {
-      await handleSetTransactions([...transactions, newTransaction]);
-    };
 
     return (
       <EntrepreneurDashboard
@@ -578,7 +584,7 @@ const AppContent = () => {
           onEditTransaction={handleOpenEditTransaction}
           onSetGoal={() => handleOpenGoalModal(currentUser.user)}
           userRole='entrepreneur'
-          onAddTransaction={handleAddTransaction}
+          onAddTransaction={writeTransaction}
       />
     );
   };
@@ -618,6 +624,16 @@ const AppContent = () => {
                 entrepreneurs={visibleEntrepreneurs()}
             />
         </Modal>
+      )}
+      {scannedTransaction && (
+         <Modal isOpen={true} onClose={handleCloseScannedTransaction} title="Confirm Scanned Expense">
+             <TransactionForm
+                 initialData={scannedTransaction}
+                 onSubmit={handleAddScannedTransaction}
+                 onCancel={handleCloseScannedTransaction}
+                 entrepreneurs={visibleEntrepreneurs()}
+             />
+         </Modal>
       )}
        {isAskAiModalOpen && (
         <AskAiModal

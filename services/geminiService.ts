@@ -1,5 +1,5 @@
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
-import type { Transaction, AiReport, Entrepreneur, GrowthPlan, ContractData, DashboardInsight, ChatMessage, Resource, SuggestedResource, Goal } from '../types';
+import type { Transaction, AiReport, Entrepreneur, GrowthPlan, ContractData, DashboardInsight, ChatMessage, Resource, SuggestedResource, Goal, PartialTransaction } from '../types';
 import { GENAI_MODEL_NAME } from '../constants';
 
 const getApiKey = (): string | undefined => {
@@ -11,7 +11,7 @@ const getApiKey = (): string | undefined => {
   }
 };
 
-export const parseExpenseFromReceipt = async (imageBase64Data: string): Promise<Partial<Transaction>> => {
+export const parseExpenseFromReceipt = async (imageBase64Data: string): Promise<PartialTransaction> => {
   const apiKey = getApiKey();
   if (!apiKey) {
     throw new Error("Gemini API key not configured. Cannot parse receipt.");
@@ -59,7 +59,7 @@ export const parseExpenseFromReceipt = async (imageBase64Data: string): Promise<
       }
     });
 
-    return JSON.parse(response.text) as Partial<Transaction>;
+    return JSON.parse(response.text) as PartialTransaction;
   } catch (error) {
     console.error("Error parsing receipt with Gemini API:", error);
     const err = error as Error;
@@ -357,217 +357,57 @@ export const generateAiPoweredReport = async (
             items: {
                 type: Type.OBJECT,
                 properties: {
-                    recommendation: { type: Type.STRING, description: "The recommendation text." },
-                    priority: { type: Type.STRING, enum: ['high', 'medium', 'low'], description: "The priority of the recommendation." }
+                    recommendation: { type: Type.STRING, description: "The actionable advice for the entrepreneur." },
+                    priority: { type: Type.STRING, enum: ['high', 'medium', 'low'], description: "The priority of the recommendation."}
                 },
                 required: ['recommendation', 'priority']
             }
         }
     },
-    required: ['reportTitle', 'executiveSummary', 'keyMetrics', 'incomeStatement', 'financialRatios', 'charts', 'swotAnalysis', 'detailedAnalysis', 'strategicRecommendations', 'cashFlowAnalysis', 'salesInsights', 'futureOutlook', 'riskAnalysis', 'varianceAnalysis', 'workingCapitalAnalysis']
+    required: ['reportTitle', 'executiveSummary', 'keyMetrics', 'incomeStatement', 'cashFlowAnalysis', 'detailedAnalysis', 'strategicRecommendations']
   };
 
-  const transactionLogs = transactions.length > 0
-    ? transactions.map(t =>
-        `- Date: ${t.date}, Type: ${t.type}, Amount: ${t.amount.toFixed(2)}, Category: ${t.productServiceCategory || 'Uncategorized'}, Status: ${t.paidStatus || 'N/A'}, Customer: ${t.customerName || 'N/A'}, Desc: ${t.description}`
-      ).join('\n')
-    : "No transactions were recorded for this period.";
-
-  const goalsContext = (goals && goals.length > 0)
-    ? `
-    CRITICAL CONTEXT: The entrepreneur has set the following goals. Your analysis MUST incorporate these goals. Comment on their progress, celebrate achievements, and provide recommendations specifically related to these targets.
-    - ${goals.map(g => `${g.title} (Type: ${g.type}, Target: ${g.targetValue}, Due: ${g.targetDate})`).join('\n- ')}
-    `
-    : "No specific goals have been set by the entrepreneur for this period.";
-
-  const systemInstruction = `Act as a senior financial consultant from a top-tier firm like McKinsey, BCG, or Bain, preparing a confidential performance review for the Africa Entrepreneurship School (AES).
-Your analysis must be formal, data-driven, and highly professional. Your tone should be objective and strategic, suitable for a board meeting.
-You will receive client and transaction data. Based on this data, generate a comprehensive financial report in JSON format that STRICTLY follows the provided schema. You must generate all sections.
-- **reportTitle**: Use a formal title like 'Confidential Financial Performance Review'.
-- **executiveSummary**: A concise, formal summary for a C-suite audience, highlighting key findings and the overall financial health.
-- **incomeStatement**: A formal 'Statement of Profit & Loss'.
-- **varianceAnalysis**: This is critical. Analyze trends within the period. If monthly, compare the first half to the second. If yearly, compare quarters or halves. Discuss revenue velocity, expense trends, and business momentum.
-- **workingCapitalAnalysis**: Provide a brief but insightful analysis of the business's liquidity. Comment on the relationship between net profit, cash from operations (inferred from transactions), and outstanding receivables (inferred from 'Pending' or 'Partial' income statuses).
-- **riskAnalysis**: Identify 2-3 plausible business risks based on the data (e.g., customer concentration, negative cash flow). Assess impact and propose concrete mitigation strategies.
-- **financialRatios**: Calculate at least two key ratios (e.g., Profit Margin, Expense Ratio). Provide the formula and a professional interpretation.
-- **swotAnalysis**: Infer strengths, weaknesses, opportunities, and threats directly from the financial data provided.
-- **detailedAnalysis**: Write deep-dive paragraphs on interesting patterns. If goals exist, one section MUST be titled "Performance Against Strategic Goals".
-- **strategicRecommendations**: This is the 'Action Plan'. Provide 3-5 high-impact, strategic recommendations, not just simple tips. Prioritize them.`;
-
   const prompt = `
-    Client: ${entrepreneur.name}, founder of "${entrepreneur.businessName}".
-    Analysis Period: ${period}.
+    Act as a professional financial analyst for a small business consultancy.
+    Your client is ${entrepreneur.name}, owner of ${entrepreneur.businessName}.
+    You are provided with their transaction data for the period: ${period}.
+    You are also provided with their business bio and goals.
 
-    ${goalsContext}
+    Data:
+    - Transactions: ${transactions.length > 0 ? JSON.stringify(transactions, null, 2) : "No transactions recorded for this period."}
+    - Entrepreneur Bio: ${entrepreneur.bio || 'Not provided'}
+    - Stated Goals: ${goals && goals.length > 0 ? JSON.stringify(goals, null, 2) : 'No specific goals provided for this period.'}
 
-    Transaction Data:
-    ${transactionLogs}
+    Your task is to generate a comprehensive, professional, and insightful financial performance report.
+    The tone should be formal, encouraging, and highly analytical.
+    Produce a JSON object that strictly adheres to the provided schema.
+    Ensure all financial values are formatted correctly as strings (e.g., 'GHS 1,234.56' or '25.5%').
+    The analysis should be deep and tailored to the provided data. Do not use placeholder text. If data is sparse, analyze the implications of that.
+    For the SWOT analysis, infer strengths, weaknesses, opportunities, and threats directly from the financial data (e.g., high profit margin is a strength, high expenses are a weakness, a new top customer is an opportunity, reliance on one customer is a threat).
   `;
-  
+
   try {
     const response = await ai.models.generateContent({
-        model: GENAI_MODEL_NAME,
-        contents: prompt,
-        config: {
-            systemInstruction: systemInstruction,
-            responseMimeType: "application/json",
-            responseSchema: reportSchema,
-            temperature: 0.4,
-        }
+      model: GENAI_MODEL_NAME,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: reportSchema,
+        temperature: 0.3,
+      }
     });
 
     return JSON.parse(response.text) as AiReport;
 
-  } catch (error)
- {
+  } catch (error) {
     console.error("Error generating AI report with Gemini API:", error);
     const err = error as Error;
     if (err.message.includes('API key not valid')) {
         throw new Error("Failed to generate report: The Gemini API key is not valid.");
     }
-    throw new Error(`Failed to generate AI report. Error: ${err.message}`);
+    throw new Error(`The AI failed to generate the report. This may be due to the data provided or an issue with the service. Please try again. Error: ${err.message}`);
   }
 };
-
-export const generateDashboardInsights = async (
-    entrepreneurs: Entrepreneur[],
-    transactions: Transaction[]
-): Promise<DashboardInsight[]> => {
-    const apiKey = getApiKey();
-    if (!apiKey) {
-        throw new Error("API key not configured.");
-    }
-    const ai = new GoogleGenAI({ apiKey });
-
-    const insightSchema = {
-        type: Type.OBJECT,
-        properties: {
-            insights: {
-                type: Type.ARRAY,
-                description: "A list of 3-4 diverse and interesting insights.",
-                items: {
-                    type: Type.OBJECT,
-                    properties: {
-                        type: { type: Type.STRING, enum: ['milestone', 'warning', 'opportunity', 'trend'], description: "The category of the insight." },
-                        title: { type: Type.STRING, description: "A short, catchy title for the insight." },
-                        description: { type: Type.STRING, description: "A one-sentence explanation of the insight." },
-                        icon: { type: Type.STRING, enum: ['🎉', '⚠️', '💡', '📉'], description: "An emoji that represents the insight type." },
-                    },
-                    required: ['type', 'title', 'description', 'icon']
-                }
-            }
-        }
-    };
-    
-    // Create a summarized, anonymized string of data to send
-    const dataSummary = `
-        Total Entrepreneurs: ${entrepreneurs.length}
-        Total Transactions: ${transactions.length}
-        Date Range: ${transactions.length > 0 ? new Date(transactions[0].date).toDateString() : 'N/A'} to ${transactions.length > 0 ? new Date(transactions[transactions.length - 1].date).toDateString() : 'N/A'}
-        
-        Example Transactions (latest 5):
-        ${transactions.slice(-5).map(t => `- Entr. ID: ${t.entrepreneurId.substring(0,5)}, Type: ${t.type}, Amount: ${t.amount}`).join('\n')}
-        
-        Entrepreneur Summaries:
-        ${entrepreneurs.map(e => `- Entr. ID: ${e.id.substring(0,5)}, Business: ${e.businessName}, Start Date: ${e.startDate}, Goals: ${e.goals?.length || 0}`).join('\n')}
-    `;
-
-    const prompt = `
-        As an expert business analyst, review the following summary of business data for a portfolio of small entrepreneurs. 
-        Your task is to identify up to 4 high-level, interesting, and actionable insights. 
-        Focus on collective trends, significant achievements, or potential risks that an admin overseeing these businesses should be aware of.
-        Do not focus on just one entrepreneur unless there is a very significant outlier.
-        Provide a diverse mix of insight types (milestone, warning, opportunity, trend).
-        
-        Data Summary:
-        ${dataSummary}
-
-        Generate a JSON object that strictly follows the provided schema.
-    `;
-    
-    try {
-        const response = await ai.models.generateContent({
-            model: GENAI_MODEL_NAME,
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: insightSchema,
-                temperature: 0.7,
-            }
-        });
-
-        const result = JSON.parse(response.text) as { insights: DashboardInsight[] };
-        return result.insights || [];
-
-    } catch (error) {
-        console.error("Error generating dashboard insights:", error);
-        throw new Error("Failed to generate AI insights.");
-    }
-};
-
-
-export const queryDataWithAi = async (
-    query: string,
-    entrepreneurs: Entrepreneur[],
-    transactions: Transaction[],
-    chatHistory: ChatMessage[]
-): Promise<string> => {
-    const apiKey = getApiKey();
-    if (!apiKey) {
-        throw new Error("API key not configured.");
-    }
-    const ai = new GoogleGenAI({ apiKey });
-
-    const dataContext = `
-        Here is the data context for the user's query.
-        Total Entrepreneurs: ${entrepreneurs.length}
-        Total Transactions: ${transactions.length}
-        
-        Entrepreneurs Data (JSON):
-        ${JSON.stringify(entrepreneurs.map(e => ({id: e.id, name: e.name, businessName: e.businessName, startDate: e.startDate, goals: e.goals?.length || 0})), null, 2)}
-        
-        Transactions Data (first 50, JSON):
-        ${JSON.stringify(transactions.slice(0, 50), null, 2)}
-    `;
-
-    // Format chat history for the model
-    const history = chatHistory.map(msg => `${msg.sender}: ${msg.text}`).join('\n');
-    
-    const prompt = `
-        You are Aida, a helpful and friendly AI data assistant for the AES JAC Admin Portal.
-        Your role is to answer questions about the provided business data.
-        Be concise, clear, and friendly in your responses. If the data is insufficient to answer, say so politely.
-        Use markdown for formatting like lists or bold text if it improves readability.
-        
-        ${dataContext}
-
-        Chat History:
-        ${history}
-
-        New User Query:
-        user: ${query}
-        ai: 
-    `;
-
-    try {
-        const response = await ai.models.generateContent({
-            model: GENAI_MODEL_NAME,
-            contents: prompt,
-            config: {
-                temperature: 0.3,
-                maxOutputTokens: 500,
-                thinkingConfig: { thinkingBudget: 0 } // Low latency for chat
-            }
-        });
-        
-        return response.text;
-
-    } catch (error) {
-        console.error("Error querying data with AI:", error);
-        throw new Error("The AI assistant could not process your request.");
-    }
-};
-
 
 export const generateGrowthPlan = async (
     businessProfile: string,
@@ -576,20 +416,20 @@ export const generateGrowthPlan = async (
     availableResources: Resource[]
 ): Promise<GrowthPlan> => {
     const apiKey = getApiKey();
-    if (!apiKey) throw new Error("API key is not configured.");
+    if (!apiKey) throw new Error("API key not configured.");
     const ai = new GoogleGenAI({ apiKey });
 
     const growthPlanSchema = {
         type: Type.OBJECT,
         properties: {
-            executiveSummary: { type: Type.STRING, description: `A 2-3 sentence strategic summary for ${entrepreneurName}.` },
+            executiveSummary: { type: Type.STRING },
             strategicRecommendations: {
                 type: Type.ARRAY,
                 items: {
                     type: Type.OBJECT,
                     properties: {
-                        title: { type: Type.STRING, description: "A catchy title for the recommendation." },
-                        recommendation: { type: Type.STRING, description: "A detailed, actionable recommendation." },
+                        title: { type: Type.STRING },
+                        recommendation: { type: Type.STRING },
                         priority: { type: Type.STRING, enum: ['High', 'Medium', 'Low'] }
                     },
                     required: ['title', 'recommendation', 'priority']
@@ -600,9 +440,9 @@ export const generateGrowthPlan = async (
                 items: {
                     type: Type.OBJECT,
                     properties: {
-                        documentName: { type: Type.STRING, description: "e.g., 'Partnership Agreement', 'Service Contract'" },
-                        description: { type: Type.STRING, description: "Why this document is needed." },
-                        contractType: { type: Type.STRING, enum: ['PARTNERSHIP_AGREEMENT', 'SERVICE_CONTRACT', 'EMPLOYMENT_CONTRACT', 'NON_DISCLOSURE_AGREEMENT'] }
+                        documentName: { type: Type.STRING },
+                        description: { type: Type.STRING },
+                        contractType: { type: Type.STRING, description: "A generic type for the contract generator, e.g., 'Partnership Agreement', 'Service Contract', 'Employment Agreement'." }
                     },
                     required: ['documentName', 'description', 'contractType']
                 }
@@ -612,75 +452,67 @@ export const generateGrowthPlan = async (
                 items: {
                     type: Type.OBJECT,
                     properties: {
-                        title: { type: Type.STRING, description: "The exact title of a resource from the provided list." },
-                        reason: { type: Type.STRING, description: `Why this specific resource is useful for ${entrepreneurName}.` }
+                        title: { type: Type.STRING },
+                        reason: { type: Type.STRING }
                     },
                     required: ['title', 'reason']
                 }
             }
         },
-        required: ['executiveSummary', 'strategicRecommendations', 'suggestedDocuments', 'suggestedResources']
+        required: ['executiveSummary', 'strategicRecommendations', 'suggestedDocuments']
     };
-    
-    const resourceList = availableResources.map(r => `- Title: "${r.title}", Tags: [${r.tags.join(', ')}]`).join('\n');
 
     const prompt = `
-        Act as a master business strategist for the Africa Entrepreneurship School.
-        Your client is ${entrepreneurName}.
+        Act as a senior business strategist for an entrepreneur named ${entrepreneurName}.
+        Analyze the following business profile and needs assessment.
         
         Business Profile:
         ${businessProfile}
-        
-        Stated Needs & Challenges:
+
+        Needs Assessment:
         ${needsAssessment}
 
-        Available learning resources:
-        ${resourceList}
+        Your task is to create a strategic growth plan.
+        1.  Write a concise executive summary of the plan.
+        2.  Provide 3-5 high-level strategic recommendations with a title, detailed recommendation, and priority.
+        3.  Suggest 2-3 essential business or legal documents that would be beneficial. For each, provide a name, a description of why it's needed, and a generic 'contractType' for an AI drafter.
+        4.  From the list of available resources provided below, select 2-3 of the MOST RELEVANT resources and explain briefly why each is recommended. List them under 'suggestedResources'.
         
-        Based on all the above information, create a strategic growth plan.
-        1. Write a concise executive summary.
-        2. Provide 3-4 high-priority, actionable strategic recommendations.
-        3. Based on the needs, suggest 1-2 relevant legal or business documents that might be necessary.
-        4. From the list of available learning resources, select the 2 most relevant resources and explain why they are a good fit. You must only choose from the titles provided.
-        
-        Generate the output as a JSON object adhering strictly to the provided schema.
+        Available Resources:
+        ${JSON.stringify(availableResources.map(r => r.title))}
+
+        Generate a JSON object that strictly adheres to the provided schema.
     `;
 
-    try {
-        const response = await ai.models.generateContent({
-            model: GENAI_MODEL_NAME,
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: growthPlanSchema,
-            }
-        });
-        return JSON.parse(response.text) as GrowthPlan;
-    } catch (error) {
-        console.error("Error generating growth plan:", error);
-        throw new Error("Failed to generate the AI growth plan.");
-    }
+    const response = await ai.models.generateContent({
+        model: GENAI_MODEL_NAME,
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: growthPlanSchema,
+            temperature: 0.5,
+        }
+    });
+
+    return JSON.parse(response.text) as GrowthPlan;
 };
 
-export const generateContract = async (
-    contractType: string,
-    businessProfile: string
-): Promise<ContractData> => {
+export const generateContract = async (contractType: string, businessProfile: string): Promise<ContractData> => {
     const apiKey = getApiKey();
-    if (!apiKey) throw new Error("API key is not configured.");
+    if (!apiKey) throw new Error("API key not configured.");
     const ai = new GoogleGenAI({ apiKey });
-    
+
     const contractSchema = {
         type: Type.OBJECT,
         properties: {
-            title: { type: Type.STRING, description: "The full title of the legal document." },
+            title: { type: Type.STRING, description: "The official title of the legal document." },
             clauses: {
                 type: Type.ARRAY,
                 items: {
                     type: Type.OBJECT,
                     properties: {
-                        title: { type: Type.STRING, description: "The title of the clause, e.g., '1. Parties'" },
-                        content: { type: Type.STRING, description: "The full text content of the clause. Use placeholders like '[Your Company Name]' or '[Partner Name]'." }
+                        title: { type: Type.STRING, description: "The title of the clause, e.g., '1. Parties', '2. Scope of Work'." },
+                        content: { type: Type.STRING, description: "The full text of the clause. Use placeholders like '[Your Name/Company]', '[Client Name/Company]', '[Date]', etc." }
                     },
                     required: ['title', 'content']
                 }
@@ -690,27 +522,157 @@ export const generateContract = async (
     };
 
     const prompt = `
-        Act as an AI legal assistant.
-        Your task is to generate a standard, editable draft of a common business document.
-        The document type required is: ${contractType}.
-        The business it is for is described as: ${businessProfile}.
-        
-        Generate a basic, standard template for this document. Use clear placeholders like [Your Name/Company], [Partner's Name], [Date], [Address], etc., where specific details are needed.
-        The output must be a JSON object that strictly follows the provided schema, containing a title and an array of clauses.
+        Act as an AI legal assistant. Your task is to generate a draft for a standard business contract.
+        IMPORTANT: This is a template and not legal advice. The user must consult a qualified lawyer.
+
+        Contract Type to Generate: ${contractType}
+        Business Profile for Context:
+        ${businessProfile}
+
+        Instructions:
+        1.  Generate a standard, simple ${contractType}.
+        2.  The title should be formal and clear.
+        3.  Create several logical clauses (e.g., Parties, Services, Payment, Term, Confidentiality, Governing Law).
+        4.  The content of each clause should be standard boilerplate text for such a contract. Use placeholders like '[Your Company Name]', '[Client Name]', '[Start Date]', '[Amount]', '[Jurisdiction]' where appropriate.
+        5.  Do NOT include a signature section in the clauses.
+        6.  The final output must be a JSON object that strictly adheres to the provided schema.
     `;
-    
-     try {
-        const response = await ai.models.generateContent({
-            model: GENAI_MODEL_NAME,
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: contractSchema,
+
+    const response = await ai.models.generateContent({
+        model: GENAI_MODEL_NAME,
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: contractSchema,
+            temperature: 0.3,
+        }
+    });
+
+    return JSON.parse(response.text) as ContractData;
+};
+
+export const generateDashboardInsights = async (entrepreneurs: Entrepreneur[], transactions: Transaction[]): Promise<DashboardInsight[]> => {
+    const apiKey = getApiKey();
+    if (!apiKey) throw new Error("API key not configured.");
+    const ai = new GoogleGenAI({ apiKey });
+
+    const insightsSchema = {
+        type: Type.OBJECT,
+        properties: {
+            insights: {
+                type: Type.ARRAY,
+                items: {
+                    type: Type.OBJECT,
+                    properties: {
+                        type: { type: Type.STRING, enum: ['milestone', 'warning', 'opportunity', 'trend'] },
+                        title: { type: Type.STRING },
+                        description: { type: Type.STRING },
+                        icon: { type: Type.STRING, enum: ['🎉', '⚠️', '💡', '📉'] },
+                        relatedEntrepreneurIds: { type: Type.ARRAY, items: { type: Type.STRING } }
+                    },
+                    required: ['type', 'title', 'description', 'icon']
+                }
             }
-        });
-        return JSON.parse(response.text) as ContractData;
-    } catch (error) {
-        console.error("Error generating contract:", error);
-        throw new Error("Failed to generate the AI document draft.");
-    }
+        },
+        required: ['insights']
+    };
+
+    // Prepare a summary of the data to keep the prompt concise
+    const dataSummary = {
+        totalEntrepreneurs: entrepreneurs.length,
+        totalTransactions: transactions.length,
+        totalIncome: transactions.filter(t => t.type === 'Income').reduce((sum, t) => sum + t.amount, 0),
+        totalExpense: transactions.filter(t => t.type === 'Expense').reduce((sum, t) => sum + t.amount, 0),
+        entrepreneurPerformance: entrepreneurs.map(e => ({
+            id: e.id,
+            name: e.businessName,
+            income: transactions.filter(t => t.entrepreneurId === e.id && t.type === 'Income').reduce((s, t) => s + t.amount, 0),
+            expense: transactions.filter(t => t.entrepreneurId === e.id && t.type === 'Expense').reduce((s, t) => s + t.amount, 0),
+            transactionCount: transactions.filter(t => t.entrepreneurId === e.id).length
+        })).sort((a,b) => b.income - a.income)
+    };
+
+    const prompt = `
+        Act as an AI business analyst reviewing dashboard data for a portfolio of small businesses.
+        Analyze the provided data summary and generate 2-4 high-level insights.
+        
+        Data Summary:
+        ${JSON.stringify(dataSummary)}
+
+        Instructions:
+        - Identify significant events or patterns. Examples: a business having exceptionally high income (milestone), a business with expenses far exceeding income (warning), a new entrepreneur showing rapid growth (opportunity), or a general trend across all businesses.
+        - For each insight, provide a clear title and a concise description.
+        - Choose the appropriate type and icon.
+        - If the insight relates to specific entrepreneurs, include their IDs.
+        - Be concise and impactful. Do not state the obvious. Find the story in the data.
+        - If there's nothing particularly noteworthy, return an empty array of insights.
+
+        Generate a JSON object that strictly adheres to the schema. The root key must be 'insights'.
+    `;
+
+    const response = await ai.models.generateContent({
+        model: GENAI_MODEL_NAME,
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: insightsSchema,
+            temperature: 0.6,
+        }
+    });
+    
+    const result = JSON.parse(response.text) as { insights: DashboardInsight[] };
+    return result.insights || [];
+};
+
+export const queryDataWithAi = async (
+    query: string,
+    entrepreneurs: Entrepreneur[],
+    transactions: Transaction[],
+    chatHistory: ChatMessage[]
+): Promise<string> => {
+    const apiKey = getApiKey();
+    if (!apiKey) throw new Error("API key not configured.");
+    const ai = new GoogleGenAI({ apiKey });
+
+    // Prepare a summary of the data to keep the prompt concise
+    const dataSummary = {
+        entrepreneurs: entrepreneurs.map(e => ({ id: e.id, name: e.name, businessName: e.businessName, startDate: e.startDate })),
+        transactions: transactions.map(t => ({
+            entrepreneurId: t.entrepreneurId,
+            type: t.type,
+            date: t.date,
+            description: t.description,
+            amount: t.amount
+        }))
+    };
+    
+    const contents = chatHistory.map(msg => ({
+        role: msg.sender === 'ai' ? 'model' : 'user',
+        parts: [{ text: msg.text }]
+    }));
+
+    const systemInstruction = `
+        You are Aida, a friendly and helpful AI data assistant for the AES JAC Admin Portal.
+        Your goal is to answer questions based on the provided JSON data about entrepreneurs and their transactions.
+        - Analyze the data to answer the user's question.
+        - Be conversational and clear in your responses.
+        - If the data is insufficient to answer, say so politely.
+        - Do not invent data. Base your answers strictly on the provided JSON.
+        - You can perform calculations like sums, averages, and comparisons.
+        - Today's date is ${new Date().toDateString()}.
+        - The currency is Ghanaian Cedis (GHS).
+
+        Here is the data available for your analysis:
+        ${JSON.stringify(dataSummary)}
+    `;
+
+    const response = await ai.models.generateContent({
+        model: GENAI_MODEL_NAME,
+        contents: contents,
+        config: {
+            systemInstruction: systemInstruction,
+        }
+    });
+
+    return response.text;
 };

@@ -1,4 +1,4 @@
-import { ref, onValue, set, type Unsubscribe } from "firebase/database";
+import { ref, onValue, set, remove, type Unsubscribe } from "firebase/database";
 import { db } from './firebaseService';
 import type { Entrepreneur, Transaction, User } from '../types';
 
@@ -10,35 +10,62 @@ const entrepreneursRef = ref(db, ENTREPRENEURS_KEY);
 const transactionsRef = ref(db, TRANSACTIONS_KEY);
 const usersRef = ref(db, USERS_KEY);
 
-export const listenToEntrepreneurs = (callback: (data: Entrepreneur[]) => void): Unsubscribe => {
-  return onValue(entrepreneursRef, (snapshot) => {
+// --- LISTENERS ---
+// These functions listen for changes and convert the Firebase object to an array for the app state
+const createListener = <T>(dbRef: any, callback: (data: T[]) => void): Unsubscribe => {
+  return onValue(dbRef, (snapshot) => {
     const data = snapshot.val();
-    callback(data ? data : []);
+    // Firebase returns null for empty paths, and an object of items if they exist
+    // This also handles legacy data that might have been stored as an array.
+     if (data) {
+        callback(Array.isArray(data) ? data.filter(Boolean) : Object.values(data));
+    } else {
+        callback([]);
+    }
   });
 };
 
-export const listenToTransactions = (callback: (data: Transaction[]) => void): Unsubscribe => {
-  return onValue(transactionsRef, (snapshot) => {
-    const data = snapshot.val();
-    callback(data ? data : []);
-  });
+export const listenToEntrepreneurs = (callback: (data: Entrepreneur[]) => void): Unsubscribe => createListener<Entrepreneur>(entrepreneursRef, callback);
+export const listenToTransactions = (callback: (data: Transaction[]) => void): Unsubscribe => createListener<Transaction>(transactionsRef, callback);
+export const listenToUsers = (callback: (data: User[]) => void): Unsubscribe => createListener<User>(usersRef, callback);
+
+
+// --- WRITERS (for individual items) ---
+export const writeEntrepreneur = (entrepreneur: Entrepreneur): Promise<void> => {
+    return set(ref(db, `${ENTREPRENEURS_KEY}/${entrepreneur.id}`), entrepreneur);
 };
 
-export const listenToUsers = (callback: (data: User[]) => void): Unsubscribe => {
-    return onValue(usersRef, (snapshot) => {
-        const data = snapshot.val();
-        callback(data ? data : []);
-    });
+export const deleteEntrepreneur = (id: string): Promise<void> => {
+    return remove(ref(db, `${ENTREPRENEURS_KEY}/${id}`));
 };
 
-export const saveEntrepreneurs = async (entrepreneurs: Entrepreneur[]): Promise<void> => {
-  await set(entrepreneursRef, entrepreneurs);
+export const writeTransaction = (transaction: Transaction): Promise<void> => {
+    return set(ref(db, `${TRANSACTIONS_KEY}/${transaction.id}`), transaction);
 };
 
-export const saveTransactions = async (transactions: Transaction[]): Promise<void> => {
-  await set(transactionsRef, transactions);
+export const deleteTransaction = (id: string): Promise<void> => {
+    return remove(ref(db, `${TRANSACTIONS_KEY}/${id}`));
 };
 
-export const saveUsers = async (users: User[]): Promise<void> => {
-    await set(usersRef, users);
+export const writeUser = (user: User): Promise<void> => {
+    return set(ref(db, `${USERS_KEY}/${user.id}`), user);
 };
+
+export const deleteUser = (id: string): Promise<void> => {
+    return remove(ref(db, `${USERS_KEY}/${id}`));
+};
+
+
+// --- OVERWRITE (for seeding and import) ---
+const arrayToObject = <T extends {id: string}>(arr: T[]): {[id: string]: T} => {
+    return arr.reduce((acc, item) => {
+        if (item && item.id) { // Ensure item has an ID
+            acc[item.id] = item;
+        }
+        return acc;
+    }, {} as {[id: string]: T});
+};
+
+export const overwriteEntrepreneurs = (entrepreneurs: Entrepreneur[]): Promise<void> => set(entrepreneursRef, arrayToObject(entrepreneurs));
+export const overwriteTransactions = (transactions: Transaction[]): Promise<void> => set(transactionsRef, arrayToObject(transactions));
+export const overwriteUsers = (users: User[]): Promise<void> => set(usersRef, arrayToObject(users));

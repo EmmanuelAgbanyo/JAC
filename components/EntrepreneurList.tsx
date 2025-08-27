@@ -16,7 +16,6 @@ interface EntrepreneurListProps {
 const EntrepreneurList = ({ entrepreneurs, onEdit, onDelete, onViewDashboard, users, currentUser }: EntrepreneurListProps) => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [entrepreneurToDelete, setEntrepreneurToDelete] = useState<Entrepreneur | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const openDeleteModal = (entrepreneur: Entrepreneur) => {
     setEntrepreneurToDelete(entrepreneur);
@@ -29,16 +28,10 @@ const EntrepreneurList = ({ entrepreneurs, onEdit, onDelete, onViewDashboard, us
   };
 
   const handleDeleteConfirm = () => {
-    if (!entrepreneurToDelete) return;
-
-    setDeletingId(entrepreneurToDelete.id);
-    closeDeleteModal();
-
-    // Wait for animation to complete before removing from state
-    setTimeout(() => {
+    if (entrepreneurToDelete) {
         onDelete(entrepreneurToDelete.id);
-        setDeletingId(null);
-    }, 300); // Duration should match the transition duration
+        closeDeleteModal();
+    }
   };
   
   const getStaffName = (staffId?: string) => {
@@ -53,9 +46,11 @@ const EntrepreneurList = ({ entrepreneurs, onEdit, onDelete, onViewDashboard, us
   }
 
   return (
-    <div className="bg-white dark:bg-dark-secondary p-6 rounded-lg shadow-md">
-      <h2 className="text-xl font-semibold text-gray-800 dark:text-dark-text mb-6">Entrepreneur Profiles</h2>
-      <div className="overflow-x-auto">
+    <div className="bg-white dark:bg-dark-secondary p-2 md:p-6 rounded-lg shadow-md">
+      <h2 className="text-xl font-semibold text-gray-800 dark:text-dark-text mb-6 px-4 md:px-0">Entrepreneur Profiles</h2>
+
+      {/* Table view for larger screens */}
+      <div className="overflow-x-auto hidden md:block">
         <table className="min-w-full divide-y divide-gray-200 dark:divide-dark-border">
           <thead className="bg-gray-50 dark:bg-dark-primary">
             <tr>
@@ -70,7 +65,7 @@ const EntrepreneurList = ({ entrepreneurs, onEdit, onDelete, onViewDashboard, us
             {entrepreneurs.map((e) => (
               <tr 
                 key={e.id} 
-                className={`transition-opacity duration-300 ${deletingId === e.id ? 'opacity-0' : 'hover:bg-gray-50 dark:hover:bg-dark-primary'}`}
+                className='hover:bg-gray-50 dark:hover:bg-dark-primary'
               >
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-dark-text">{e.name}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-dark-textSecondary">{e.businessName}</td>
@@ -86,6 +81,30 @@ const EntrepreneurList = ({ entrepreneurs, onEdit, onDelete, onViewDashboard, us
           </tbody>
         </table>
       </div>
+      
+      {/* Card view for smaller screens */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:hidden">
+        {entrepreneurs.map(e => (
+          <div key={e.id} className="bg-gray-50 dark:bg-dark-primary rounded-lg p-4 shadow-sm border dark:border-dark-border flex flex-col justify-between space-y-4">
+            <div>
+              <p className="font-bold text-lg text-primary">{e.businessName}</p>
+              <p className="text-sm text-gray-800 dark:text-dark-text">{e.name}</p>
+              <p className="text-sm text-gray-600 dark:text-dark-textSecondary mt-1">{e.contact}</p>
+              {canManage && (
+                <p className="text-xs text-gray-500 dark:text-dark-textSecondary mt-2 pt-2 border-t dark:border-dark-border">
+                  Assigned to: <span className="font-semibold">{getStaffName(e.assignedStaffId)}</span>
+                </p>
+              )}
+            </div>
+            <div className="flex justify-end space-x-2 border-t dark:border-dark-border pt-3 mt-auto">
+                <Button variant="primary" size="sm" onClick={() => onViewDashboard(e)}>Dashboard</Button>
+                <Button variant="info" size="sm" onClick={() => onEdit(e)}>Edit</Button>
+                {canManage && <Button variant="danger" size="sm" onClick={() => openDeleteModal(e)}>Delete</Button>}
+            </div>
+          </div>
+        ))}
+      </div>
+
       <Modal
         isOpen={showDeleteModal}
         onClose={closeDeleteModal}

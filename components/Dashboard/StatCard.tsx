@@ -42,10 +42,10 @@ const StatCard = ({ title, value, previousValue, formatAs = 'number', isExpense 
     };
     
     return (
-        <div className="bg-white p-5 rounded-lg shadow-md border border-gray-200">
-            <p className="text-sm font-medium text-gray-500">{title}</p>
+        <div className="bg-white dark:bg-dark-secondary p-5 rounded-lg shadow-md border border-gray-200 dark:border-dark-border">
+            <p className="text-sm font-medium text-gray-500 dark:text-dark-textSecondary">{title}</p>
             <div className="mt-2 flex items-baseline space-x-2">
-                <p className="text-3xl font-bold text-gray-900">{formatValue(value)}</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-dark-text">{formatValue(value)}</p>
                 { !isNaN(percentageChange) && Math.abs(percentageChange) > 0 && Math.abs(percentageChange) !== Infinity && (
                     <div className={`flex items-center text-sm font-semibold ${trendColor}`}>
                         <TrendArrow />
@@ -53,9 +53,9 @@ const StatCard = ({ title, value, previousValue, formatAs = 'number', isExpense 
                     </div>
                 )}
             </div>
-            <p className="text-xs text-gray-400 mt-1">vs. {formatValue(previousValue)} previous period</p>
+            <p className="text-xs text-gray-400 dark:text-dark-textSecondary mt-1">vs. {formatValue(previousValue)} previous period</p>
         </div>
     );
 };
 
-export default StatCard;
+export default React.memo(StatCard);

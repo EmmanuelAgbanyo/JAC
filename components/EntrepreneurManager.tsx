@@ -7,7 +7,7 @@ import Button from './ui/Button';
 
 interface EntrepreneurManagerProps {
   entrepreneurs: Entrepreneur[];
-  setEntrepreneurs: (entrepreneurs: Entrepreneur[]) => Promise<void>;
+  onAddOrUpdateEntrepreneur: (entrepreneur: Entrepreneur) => Promise<void>;
   editingEntrepreneur: Entrepreneur | null;
   setEditingEntrepreneur: (entrepreneur: Entrepreneur | null) => void;
   currentView: AppView;
@@ -21,7 +21,7 @@ interface EntrepreneurManagerProps {
 
 const EntrepreneurManager = ({
   entrepreneurs,
-  setEntrepreneurs,
+  onAddOrUpdateEntrepreneur,
   editingEntrepreneur,
   setEditingEntrepreneur,
   currentView,
@@ -35,19 +35,15 @@ const EntrepreneurManager = ({
   const handleAddOrUpdateEntrepreneur = async (entrepreneurData: Omit<Entrepreneur, 'goals'>) => {
     const isEditing = entrepreneurs.some(e => e.id === entrepreneurData.id);
     
-    let updatedEntrepreneur: Entrepreneur;
+    let finalEntrepreneur: Entrepreneur;
     if (isEditing) {
         const originalEntrepreneur = entrepreneurs.find(e => e.id === entrepreneurData.id)!;
-        updatedEntrepreneur = { ...originalEntrepreneur, ...entrepreneurData };
+        finalEntrepreneur = { ...originalEntrepreneur, ...entrepreneurData };
     } else {
-        updatedEntrepreneur = { ...entrepreneurData, goals: [] };
+        finalEntrepreneur = { ...entrepreneurData, goals: [] };
     }
-
-    const updatedEntrepreneurs = isEditing
-      ? entrepreneurs.map(e => (e.id === updatedEntrepreneur.id ? updatedEntrepreneur : e))
-      : [...entrepreneurs, updatedEntrepreneur];
       
-    await setEntrepreneurs(updatedEntrepreneurs);
+    await onAddOrUpdateEntrepreneur(finalEntrepreneur);
     setEditingEntrepreneur(null);
     navigateTo(AppView.ENTREPRENEURS); // Navigate to list view after save
   };

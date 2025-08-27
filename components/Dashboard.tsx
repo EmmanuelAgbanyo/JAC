@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { Entrepreneur, Transaction } from '../types';
 import { TransactionType } from '../constants';
 import StatCard from './Dashboard/StatCard';
@@ -137,7 +137,7 @@ const Dashboard = ({ entrepreneurs, transactions }: DashboardProps) => {
     <div className="space-y-6 animate-fadeIn">
       <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
         <h1 className="text-3xl font-bold text-gray-800 dark:text-dark-text">Admin Dashboard</h1>
-        <div className="bg-white dark:bg-dark-secondary p-1 rounded-lg shadow-sm border dark:border-dark-border flex items-center">
+        <div className="bg-white dark:bg-dark-secondary p-1 rounded-lg shadow-sm border dark:border-dark-border flex items-center flex-wrap">
             {DATE_RANGE_OPTIONS.map(opt => (
                 <button 
                     key={opt.key}

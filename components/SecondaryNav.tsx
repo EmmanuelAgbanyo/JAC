@@ -61,7 +61,7 @@ const SecondaryNav = ({ currentView, navigateTo, currentUser }: SecondaryNavProp
     // Determine active tab, grouping related views
     const getIsActive = (view: AppView) => {
         if (view === AppView.ENTREPRENEURS) {
-            return [AppView.ENTREPRENEURS, AppView.ADD_ENTREPRENEUR, AppView.EDIT_ENTREPRENEUR].includes(currentView);
+            return [AppView.ENTREPRENEURS, AppView.ADD_ENTREPRENEUR, AppView.EDIT_ENTREPRENEUR, AppView.ENTREPRENEUR_DASHBOARD].includes(currentView);
         }
         return currentView === view;
     };
@@ -70,7 +70,7 @@ const SecondaryNav = ({ currentView, navigateTo, currentUser }: SecondaryNavProp
     return (
         <nav className="bg-white dark:bg-dark-secondary shadow-md sticky top-16 z-30">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center space-x-2 h-14 overflow-x-auto">
+                <div className="flex flex-wrap items-center gap-2 py-3">
                     {visibleNavItems.map(item => (
                          <NavLink
                             key={item.view}

@@ -1,5 +1,5 @@
 import React, { useState, type ChangeEvent, type FormEvent, useEffect } from 'react';
-import type { Entrepreneur, Transaction } from '../types';
+import type { Entrepreneur, Transaction, PartialTransaction } from '../types';
 import { TransactionType, PaymentMethod, PaidStatus } from '../constants';
 import Button from './ui/Button';
 import Input from './ui/Input';
@@ -8,7 +8,7 @@ import Select from './ui/Select';
 interface TransactionFormProps {
   onSubmit: (transaction: Transaction) => void;
   onCancel?: () => void;
-  initialData?: Transaction;
+  initialData?: Transaction | PartialTransaction;
   entrepreneurs: Entrepreneur[];
   currentEntrepreneur?: Entrepreneur; // For logged-in entrepreneur view
 }
@@ -17,7 +17,19 @@ const TransactionForm = ({ onSubmit, onCancel, initialData, entrepreneurs, curre
   
   const getInitialState = () => {
     if (initialData) {
-      return { ...initialData, amount: String(initialData.amount) };
+       // Check if it's a full transaction (editing) or partial (from scanner)
+      const isFullTransaction = 'id' in initialData;
+      return {
+        entrepreneurId: isFullTransaction ? initialData.entrepreneurId : currentEntrepreneur?.id || '',
+        type: initialData.type || TransactionType.EXPENSE, // Default to Expense for scanned receipts
+        date: initialData.date ? new Date(initialData.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        description: initialData.description || '',
+        amount: String(initialData.amount || ''),
+        paymentMethod: initialData.paymentMethod || currentEntrepreneur?.preferredPaymentType || PaymentMethod.CASH,
+        paidStatus: initialData.paidStatus || PaidStatus.FULL,
+        customerName: initialData.customerName || '',
+        productServiceCategory: initialData.productServiceCategory || '',
+      };
     }
     return {
       entrepreneurId: currentEntrepreneur?.id || '',
@@ -105,15 +117,15 @@ const TransactionForm = ({ onSubmit, onCancel, initialData, entrepreneurs, curre
         const finalTransaction: Transaction = {
           ...(initialData || {}),
           ...formData,
-          id: initialData?.id || crypto.randomUUID(),
+          id: (initialData && 'id' in initialData) ? initialData.id! : crypto.randomUUID(),
           amount: parseFloat(formData.amount),
           paidStatus: formData.type === TransactionType.INCOME ? formData.paidStatus : undefined,
-        };
+        } as Transaction;
         
         setIsSuccess(true);
         setTimeout(() => {
           onSubmit(finalTransaction);
-          if (!initialData) { // only reset if it was a new entry
+          if (!(initialData && 'id' in initialData)) { // only reset if it was a new entry (not an edit)
             setFormData(getInitialState());
             setIsSuccess(false);
           }
@@ -126,11 +138,13 @@ const TransactionForm = ({ onSubmit, onCancel, initialData, entrepreneurs, curre
   const paymentMethodOptions = Object.values(PaymentMethod).map(m => ({ value: m, label: m }));
   const paidStatusOptions = Object.values(PaidStatus).map(s => ({ value: s, label: s }));
 
-  const successMessage = initialData ? "Saved!" : "Success! Transaction added.";
+  const isEditing = initialData && 'id' in initialData;
+  const successMessage = isEditing ? "Saved!" : "Success! Transaction added.";
+  const title = isEditing ? 'Edit Transaction' : (initialData ? 'Confirm Scanned Expense' : 'Add New Transaction');
+
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <h2 className="text-2xl font-semibold text-gray-800 dark:text-dark-text mb-6">{initialData ? 'Edit Transaction' : 'Add New Transaction'}</h2>
       
       {!currentEntrepreneur && (
         <Select
@@ -225,7 +239,7 @@ const TransactionForm = ({ onSubmit, onCancel, initialData, entrepreneurs, curre
       <div className="flex justify-end items-center space-x-3 pt-4 border-t dark:border-dark-border mt-4">
          {onCancel && <Button type="button" variant="secondary" onClick={onCancel} disabled={isSuccess}>Cancel</Button>}
          <Button type="submit" variant={isSuccess ? "success" : "primary"} disabled={isSuccess}>
-            {isSuccess ? successMessage : (initialData ? 'Save Changes' : 'Add Transaction')}
+            {isSuccess ? successMessage : (isEditing ? 'Save Changes' : 'Add Transaction')}
         </Button>
       </div>
     </form>

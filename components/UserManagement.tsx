@@ -8,7 +8,8 @@ import Select from './ui/Select';
 
 interface UserManagementProps {
   allUsers: User[];
-  setUsers: (users: User[]) => Promise<void>;
+  onSaveUser: (user: User) => Promise<void>;
+  onDeleteUser: (id: string) => Promise<void>;
 }
 
 const UserForm = ({ onSubmit, onCancel, initialData }: { onSubmit: (user: User) => void, onCancel: () => void, initialData?: User | null }) => {
@@ -25,13 +26,19 @@ const UserForm = ({ onSubmit, onCancel, initialData }: { onSubmit: (user: User) 
             alert('Please fill all required fields.');
             return;
         }
+        const finalPassword = formData.password || initialData?.password;
+        if (!finalPassword) {
+            alert('A password is required for new users.');
+            return;
+        }
+
         onSubmit({
             ...initialData,
             id: initialData?.id || crypto.randomUUID(),
             username: formData.username,
-            password: formData.password || initialData?.password, // Keep old password if new one isn't entered
+            password: finalPassword,
             role: formData.role,
-        });
+        } as User);
     };
 
     const roleOptions = Object.values(Role)
@@ -71,7 +78,7 @@ const UserForm = ({ onSubmit, onCancel, initialData }: { onSubmit: (user: User) 
     );
 };
 
-const UserManagement = ({ allUsers, setUsers }: UserManagementProps) => {
+const UserManagement = ({ allUsers, onSaveUser, onDeleteUser }: UserManagementProps) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
 
@@ -86,19 +93,13 @@ const UserManagement = ({ allUsers, setUsers }: UserManagementProps) => {
     };
 
     const handleSaveUser = async (userData: User) => {
-        const isEditing = allUsers.some(u => u.id === userData.id);
-        const updatedUsers = isEditing
-            ? allUsers.map(u => (u.id === userData.id ? { ...u, ...userData } : u))
-            : [...allUsers, userData];
-        
-        await setUsers(updatedUsers);
+        await onSaveUser(userData);
         handleCloseModal();
     };
 
     const handleDeleteUser = async (userId: string) => {
         if (window.confirm('Are you sure you want to delete this user? This cannot be undone.')) {
-            const updatedUsers = allUsers.filter(u => u.id !== userId);
-            await setUsers(updatedUsers);
+            await onDeleteUser(userId);
         }
     };
 

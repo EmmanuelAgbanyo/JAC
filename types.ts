@@ -44,6 +44,9 @@ export interface Transaction {
   productServiceCategory?: string;
 }
 
+export type PartialTransaction = Partial<Omit<Transaction, 'id' | 'entrepreneurId' | 'amount'>> & { amount?: string | number };
+
+
 export interface ReportData {
   totalIncome: number;
   totalExpenses: number;
