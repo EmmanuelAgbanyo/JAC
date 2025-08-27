@@ -1,6 +1,5 @@
-
 import React from 'react';
-import type { Entrepreneur } from '../types';
+import type { Entrepreneur, User, CurrentUser } from '../types';
 import { AppView } from '../constants';
 import EntrepreneurForm from './EntrepreneurForm';
 import EntrepreneurList from './EntrepreneurList';
@@ -8,7 +7,7 @@ import Button from './ui/Button';
 
 interface EntrepreneurManagerProps {
   entrepreneurs: Entrepreneur[];
-  setEntrepreneurs: (entrepreneurs: Entrepreneur[]) => void;
+  setEntrepreneurs: (entrepreneurs: Entrepreneur[]) => Promise<void>;
   editingEntrepreneur: Entrepreneur | null;
   setEditingEntrepreneur: (entrepreneur: Entrepreneur | null) => void;
   currentView: AppView;
@@ -16,6 +15,8 @@ interface EntrepreneurManagerProps {
   onEdit: (entrepreneur: Entrepreneur) => void;
   onViewDashboard: (entrepreneur: Entrepreneur) => void;
   onDeleteEntrepreneur: (id: string) => void;
+  users: User[];
+  currentUser: { type: 'system', user: User };
 }
 
 const EntrepreneurManager = ({
@@ -27,14 +28,26 @@ const EntrepreneurManager = ({
   navigateTo,
   onEdit,
   onViewDashboard,
-  onDeleteEntrepreneur
+  onDeleteEntrepreneur,
+  users,
+  currentUser
 }: EntrepreneurManagerProps) => {
-  const handleAddOrUpdateEntrepreneur = (entrepreneur: Entrepreneur) => {
-    const isEditing = entrepreneurs.some(e => e.id === entrepreneur.id);
+  const handleAddOrUpdateEntrepreneur = async (entrepreneurData: Omit<Entrepreneur, 'goals'>) => {
+    const isEditing = entrepreneurs.some(e => e.id === entrepreneurData.id);
+    
+    let updatedEntrepreneur: Entrepreneur;
+    if (isEditing) {
+        const originalEntrepreneur = entrepreneurs.find(e => e.id === entrepreneurData.id)!;
+        updatedEntrepreneur = { ...originalEntrepreneur, ...entrepreneurData };
+    } else {
+        updatedEntrepreneur = { ...entrepreneurData, goals: [] };
+    }
+
     const updatedEntrepreneurs = isEditing
-      ? entrepreneurs.map(e => e.id === entrepreneur.id ? entrepreneur : e)
-      : [...entrepreneurs, entrepreneur];
-    setEntrepreneurs(updatedEntrepreneurs);
+      ? entrepreneurs.map(e => (e.id === updatedEntrepreneur.id ? updatedEntrepreneur : e))
+      : [...entrepreneurs, updatedEntrepreneur];
+      
+    await setEntrepreneurs(updatedEntrepreneurs);
     setEditingEntrepreneur(null);
     navigateTo(AppView.ENTREPRENEURS); // Navigate to list view after save
   };
@@ -47,13 +60,20 @@ const EntrepreneurManager = ({
   return (
     <div className="space-y-8">
       {currentView === AppView.ADD_ENTREPRENEUR && (
-        <EntrepreneurForm onSubmit={handleAddOrUpdateEntrepreneur} onCancel={() => navigateTo(AppView.ENTREPRENEURS)} />
+        <EntrepreneurForm 
+          onSubmit={handleAddOrUpdateEntrepreneur} 
+          onCancel={() => navigateTo(AppView.ENTREPRENEURS)} 
+          users={users}
+          currentUser={currentUser}
+        />
       )}
       {currentView === AppView.EDIT_ENTREPRENEUR && editingEntrepreneur && (
         <EntrepreneurForm 
           onSubmit={handleAddOrUpdateEntrepreneur} 
           initialData={editingEntrepreneur}
           onCancel={handleCancelEdit} 
+          users={users}
+          currentUser={currentUser}
         />
       )}
       {currentView === AppView.ENTREPRENEURS && (
@@ -69,6 +89,8 @@ const EntrepreneurManager = ({
             onEdit={onEdit}
             onDelete={onDeleteEntrepreneur}
             onViewDashboard={onViewDashboard}
+            users={users}
+            currentUser={currentUser}
           />
         </>
       )}

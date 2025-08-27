@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, type ReactNode } from 'react';
 
 interface ModalProps {
@@ -49,14 +48,14 @@ const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
       aria-labelledby="modal-title-id" // Use a unique ID for aria-labelledby
     >
       <div 
-        className={`bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4 transform transition-all duration-300 ease-out 
+        className={`bg-white dark:bg-dark-secondary rounded-lg shadow-xl p-6 w-full max-w-md mx-4 transform transition-all duration-300 ease-out 
                     ${animatePanelIn ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}
       >
         <div className="flex justify-between items-center mb-4">
-          <h2 id="modal-title-id" className="text-xl font-semibold text-gray-800">{title}</h2> {/* Add id attribute */}
+          <h2 id="modal-title-id" className="text-xl font-semibold text-gray-800 dark:text-dark-text">{title}</h2> {/* Add id attribute */}
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 focus:outline-none text-2xl"
+            className="text-gray-500 hover:text-gray-700 dark:text-dark-textSecondary dark:hover:text-dark-text focus:outline-none text-2xl"
             aria-label="Close modal"
           >
             &times;

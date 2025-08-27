@@ -9,7 +9,7 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 const Select = ({ label, id, error, options, className, value, ...props }: SelectProps) => {
   const isPlaceholderSelected = value === "" || value === undefined;
   // Placeholder text is light gray if a placeholder is selected, otherwise dark gray for actual value.
-  const textColorClass = isPlaceholderSelected ? 'text-gray-500' : 'text-gray-900';
+  const textColorClass = isPlaceholderSelected ? 'text-gray-500 dark:text-dark-textSecondary' : 'text-gray-900 dark:text-dark-text';
 
   const placeholderText = options.length === 0 
     ? (label ? `No ${label.toLowerCase()} available` : 'No options available')
@@ -21,18 +21,18 @@ const Select = ({ label, id, error, options, className, value, ...props }: Selec
 
   return (
     <div className="mb-4">
-      {label && <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>}
+      {label && <label htmlFor={id} className="block text-sm font-medium text-gray-700 dark:text-dark-textSecondary mb-1">{label}</label>}
       <select
         id={id}
         value={value}
-        className={`mt-1 block w-full pl-3 pr-10 py-2 text-base border ${error ? 'border-red-500' : 'border-gray-300'} focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-md bg-white ${textColorClass} ${className || ''}`}
+        className={`mt-1 block w-full pl-3 pr-10 py-2 text-base border ${error ? 'border-red-500' : 'border-gray-300 dark:border-dark-border'} focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-md bg-white dark:bg-dark-secondary ${textColorClass} ${className || ''}`}
         {...props}
       >
         <option value="" disabled={isPlaceholderDisabled} hidden={isPlaceholderSelected && props.required}> {/* Hide placeholder from list if required and selected for better UX */}
           {placeholderText}
         </option>
         {options.map(option => (
-          <option key={option.value} value={option.value} className="text-gray-900"> {/* Ensure options have dark text */}
+          <option key={option.value} value={option.value} className="text-gray-900 dark:text-dark-text dark:bg-dark-primary"> {/* Ensure options have dark text */}
             {option.label}
           </option>
         ))}

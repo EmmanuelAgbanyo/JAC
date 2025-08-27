@@ -1,3 +1,4 @@
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { Entrepreneur, Transaction, ReportData } from '../types';
@@ -91,81 +92,4 @@ export const generateReportData = (
     totalBilled,
     topSellingItems,
   };
-};
-
-export const exportReportToCSV = (
-    reportData: ReportData, 
-    allTransactions: Transaction[],
-    entrepreneurId: string,
-    period: string,
-    entrepreneurName: string // Full entrepreneur object could be passed too
-  ): void => {
-  const transactionsForReport = allTransactions.filter(
-    t => t.entrepreneurId === entrepreneurId && t.date.startsWith(period)
-  );
-
-  let csvContent = "data:text/csv;charset=utf-8,";
-  
-  const reportPeriod = period.length === 7 
-    ? new Date(period + "-02").toLocaleString('default', { month: 'long', year: 'numeric' })
-    : `Year ${period}`;
-
-  csvContent += "AES Just A Call (JAC) Financial Performance Report\n";
-  csvContent += `Entrepreneur,"${entrepreneurName}"\n`;
-  csvContent += `Period,"${reportPeriod}"\n\n`;
-  
-  csvContent += "Financial Summary\n";
-  csvContent += `Total Income (GHS),"${reportData.totalIncome.toFixed(2)}"\n`;
-  csvContent += `Total Billed This Period (GHS),"${reportData.totalBilled?.toFixed(2) ?? 'N/A'}"\n`;
-  csvContent += `Total Expenses (GHS),"${reportData.totalExpenses.toFixed(2)}"\n`;
-  csvContent += `Net Income (GHS),"${reportData.netIncome.toFixed(2)}"\n`;
-  csvContent += `Outstanding Receivables (GHS),"${reportData.receivablesSummary.total.toFixed(2)}"\n`;
-  csvContent += `Outstanding Receivables Count,"${reportData.receivablesSummary.count}"\n`;
-  csvContent += `Collection Rate (%),"${reportData.collectionRate?.toFixed(1) ?? 'N/A'}"\n`;
-  csvContent += `Full Payment Rate (Income Transactions) (%),"${reportData.fullPaymentRate.toFixed(1)}"\n\n`;
-
-  csvContent += "Income by Category\n";
-  csvContent += "Category,Amount (GHS),Percentage of Total Billed\n";
-  reportData.incomeByCategory.forEach(item => {
-    csvContent += `"${item.category}",${item.amount.toFixed(2)},${item.percentage.toFixed(1)}\n`;
-  });
-  csvContent += "\n";
-
-  csvContent += "Expense by Category\n";
-  csvContent += "Category,Amount (GHS),Percentage of Total Expenses\n";
-  reportData.expenseByCategory.forEach(item => {
-    csvContent += `"${item.category}",${item.amount.toFixed(2)},${item.percentage.toFixed(1)}\n`;
-  });
-  csvContent += "\n";
-
-  csvContent += "All Transactions for Period\n";
-  const headers = ["Date", "Type", "Description", "Amount (GHS)", "Payment Method", "Paid Status", "Customer Name", "Product/Service Category"];
-  csvContent += headers.join(",") + "\n";
-
-  transactionsForReport.forEach(t => {
-    const row = [
-      t.date,
-      t.type,
-      `"${t.description.replace(/"/g, '""')}"`, 
-      t.amount.toFixed(2),
-      t.paymentMethod,
-      t.type === TransactionType.INCOME ? t.paidStatus : '',
-      `"${t.customerName?.replace(/"/g, '""') || ''}"`,
-      `"${t.productServiceCategory?.replace(/"/g, '""') || ''}"`
-    ];
-    csvContent += row.join(",") + "\n";
-  });
-  
-  if(reportData.geminiInsights) {
-    csvContent += "\nStrategic Insights & Recommendations\n";
-    csvContent += `"${reportData.geminiInsights.replace(/"/g, '""').replace(/\n/g, ' ')}"\n`; // Flatten for CSV
-  }
-
-  const encodedUri = encodeURI(csvContent);
-  const link = document.createElement("a");
-  link.setAttribute("href", encodedUri);
-  link.setAttribute("download", `Report_Data_${entrepreneurName.replace(/\s/g, '_')}_${period}.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
 };

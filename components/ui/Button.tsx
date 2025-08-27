@@ -16,14 +16,14 @@ const Button = ({
   className,
   ...props
 }: ButtonProps) => {
-  const baseStyles = "font-semibold rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition ease-in-out duration-150 flex items-center justify-center";
+  const baseStyles = "font-semibold rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all ease-in-out duration-200 flex items-center justify-center transform hover:scale-105";
   
   const variantStyles = {
-    primary: 'bg-primary hover:opacity-90 text-white focus:ring-primary',
+    primary: 'bg-primary hover:bg-primary-hover text-white focus:ring-primary',
     secondary: 'bg-gray-200 hover:bg-gray-300 text-gray-800 focus:ring-gray-400 border border-gray-300',
     danger: 'bg-danger hover:opacity-90 text-white focus:ring-danger',
     success: 'bg-success hover:opacity-90 text-white focus:ring-success',
-    warning: 'bg-warning hover:opacity-90 text-white focus:ring-warning',
+    warning: 'bg-warning hover:bg-warning-hover text-white focus:ring-warning',
     info: 'bg-info hover:opacity-90 text-white focus:ring-info',
     ghost: 'bg-white/10 hover:bg-white/20 text-white focus:ring-white'
   };

@@ -8,6 +8,7 @@ import { generateGrowthPlan } from '../services/geminiService';
 import GrowthReportView from './GrowthReportView';
 import { RESOURCE_LIBRARY } from '../data/resourceLibrary';
 import Input from './ui/Input';
+import Textarea from './ui/Textarea';
 
 interface GrowthHubProps {
     entrepreneurs: Entrepreneur[];
@@ -44,7 +45,8 @@ const GrowthHub = ({ entrepreneurs }: GrowthHubProps) => {
     const [businessProfile, setBusinessProfile] = useState<string>('');
     const [needsAssessment, setNeedsAssessment] = useState<string>('');
     const [isLoading, setIsLoading] = useState<boolean>(false);
-    const [error, setError] = useState<string | null>(null);
+    const [apiError, setApiError] = useState<string | null>(null);
+    const [formErrors, setFormErrors] = useState({ businessProfile: '', needsAssessment: '' });
     const [growthPlan, setGrowthPlan] = useState<GrowthPlan | null>(null);
 
     // State for Library
@@ -62,15 +64,33 @@ const GrowthHub = ({ entrepreneurs }: GrowthHubProps) => {
         }
     }, [selectedEntrepreneurId, entrepreneurs]);
 
+    const validateForm = (): boolean => {
+        let errors = { businessProfile: '', needsAssessment: '' };
+        let isValid = true;
+        
+        if (!businessProfile.trim() || businessProfile.trim().length < 50) {
+            errors.businessProfile = "Please provide a detailed profile (min 50 characters).";
+            isValid = false;
+        }
+        if (!needsAssessment.trim() || needsAssessment.trim().length < 20) {
+            errors.needsAssessment = "Please describe the business needs (min 20 characters).";
+            isValid = false;
+        }
+        
+        setFormErrors(errors);
+        return isValid;
+    };
+
     const handleGeneratePlan = async () => {
-        const selectedEntrepreneur = entrepreneurs.find(e => e.id === selectedEntrepreneurId);
-        if (!selectedEntrepreneur || !businessProfile.trim() || !needsAssessment.trim()) {
-            setError("Please select an entrepreneur and fill out both the profile and needs assessment.");
+        setApiError(null);
+        if (!validateForm()) {
             return;
         }
 
+        const selectedEntrepreneur = entrepreneurs.find(e => e.id === selectedEntrepreneurId);
+        if (!selectedEntrepreneur) return;
+
         setIsLoading(true);
-        setError(null);
         setGrowthPlan(null);
 
         try {
@@ -81,7 +101,7 @@ const GrowthHub = ({ entrepreneurs }: GrowthHubProps) => {
             setGrowthPlan(plan);
         } catch (err) {
             console.error("Error generating growth plan:", err);
-            setError((err as Error).message || "An unknown error occurred while generating the plan.");
+            setApiError((err as Error).message || "An unknown error occurred while generating the plan.");
         } finally {
             setIsLoading(false);
         }
@@ -146,29 +166,31 @@ const GrowthHub = ({ entrepreneurs }: GrowthHubProps) => {
                             required
                         />
 
-                        <div>
-                            <label htmlFor="businessProfile" className="block text-sm font-medium text-gray-700 mb-1">Business Profile & Bio</label>
-                            <textarea
-                                id="businessProfile"
-                                rows={5}
-                                className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm text-gray-900 placeholder:text-gray-500"
-                                placeholder="Describe the business, its mission, products/services, and target market."
-                                value={businessProfile}
-                                onChange={(e) => setBusinessProfile(e.target.value)}
-                            />
-                        </div>
+                        <Textarea
+                            label="Business Profile & Bio"
+                            id="businessProfile"
+                            rows={5}
+                            placeholder="Describe the business, its mission, products/services, and target market."
+                            value={businessProfile}
+                            onChange={(e) => {
+                                setBusinessProfile(e.target.value);
+                                if (formErrors.businessProfile) setFormErrors(p => ({...p, businessProfile: ''}));
+                            }}
+                            error={formErrors.businessProfile}
+                        />
 
-                         <div>
-                            <label htmlFor="needsAssessment" className="block text-sm font-medium text-gray-700 mb-1">Needs Assessment</label>
-                            <textarea
-                                id="needsAssessment"
-                                rows={5}
-                                className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm text-gray-900 placeholder:text-gray-500"
-                                placeholder="What are the entrepreneur's current challenges, goals, or areas where they need help? (e.g., 'needs help with marketing', 'wants to formalize a partnership', 'struggling with cash flow')."
-                                value={needsAssessment}
-                                onChange={(e) => setNeedsAssessment(e.target.value)}
-                            />
-                        </div>
+                        <Textarea
+                            label="Needs Assessment"
+                            id="needsAssessment"
+                            rows={5}
+                            placeholder="What are the entrepreneur's current challenges, goals, or areas where they need help? (e.g., 'needs help with marketing', 'wants to formalize a partnership', 'struggling with cash flow')."
+                            value={needsAssessment}
+                            onChange={(e) => {
+                                setNeedsAssessment(e.target.value);
+                                if (formErrors.needsAssessment) setFormErrors(p => ({...p, needsAssessment: ''}));
+                            }}
+                            error={formErrors.needsAssessment}
+                        />
                     </div>
 
                     <div className="border-t border-gray-200 pt-4 mt-4">
@@ -179,7 +201,7 @@ const GrowthHub = ({ entrepreneurs }: GrowthHubProps) => {
                         </div>
                     </div>
 
-                    {error && <p className="text-red-500 bg-red-100 p-3 rounded-md mt-4">{error}</p>}
+                    {apiError && <p className="text-red-500 bg-red-100 p-3 rounded-md mt-4">{apiError}</p>}
                 </div>
             )}
             

@@ -4,34 +4,75 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AES JAC Admin Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Lora:wght@400;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
+      darkMode: 'class', // Enable dark mode
       theme: {
         extend: {
+          fontFamily: {
+            'lato': ['Lato', 'sans-serif'],
+            'lorin': ['Lora', 'serif'],
+          },
           colors: {
-            // Core Palette based on dark yellow, green, and blue
-            primary: '#004AAD',     // Professional Blue
-            secondary: '#F3F4F6',   // Light Gray Background (like tailwind gray-100)
-            accent: '#D4A017',      // Dark Yellow (Ochre/Mustard)
-            success: '#28a745',     // Vibrant Green
+            primary: {
+              DEFAULT: '#0A369D',     // Rich Royal Blue
+              hover: '#082A7A'
+            },
+            secondary: '#F3F4F6',   // Light Gray Background
+            accent: {
+              DEFAULT: '#E1A11A',      // Vibrant Gold
+              hover: '#C88A0A'
+            },
+            success: '#004D40',     // Dark Green (AES Green)
             danger: '#dc3545',      // Clear Red
             info: '#00B8D9',        // Light Blue
-            warning: '#D4A017',     // Use accent for warnings
+            warning: {              // Use accent for warnings
+              DEFAULT: '#E1A11A',
+              hover: '#C88A0A'
+            },
 
             // AES Branding aliases for consistency
-            aesBlue: '#004AAD',
-            aesGreen: '#28a745',
-            aesYellow: '#D4A017',
+            aesBlue: '#0A369D',
+            aesGreen: '#004D40',
+            aesYellow: '#E1A11A',
+
+            // Dark theme colors
+            dark: {
+              primary: '#0d1117',       // Near-black
+              secondary: '#161b22',    // Lighter charcoal
+              text: '#e6edf3',         // Light gray text
+              textSecondary: '#8b949e',// Dimmer gray text
+              border: '#30363d',       // Border color
+            }
           }
         }
       }
     }
   </script>
   <style>
+    /* New Login Container Style */
+    .login-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 1rem;
+    }
     input[type="date"]::-webkit-calendar-picker-indicator {
         opacity: 0;
         cursor: pointer;
+    }
+    .main-content {
+      padding: 2rem;
+    }
+    @media (max-width: 768px) {
+      .main-content {
+        padding: 1rem;
+      }
     }
     @media print {
       body {
@@ -57,6 +98,10 @@
       .print-text-black {
         color: black !important;
       }
+      .report-page {
+        box-shadow: none !important;
+        border: none !important;
+      }
     }
     /* Styles for the "Ask AI" chat modal */
     .chat-container::-webkit-scrollbar {
@@ -65,6 +110,9 @@
     .chat-container::-webkit-scrollbar-track {
         background: #f1f1f1;
     }
+    .dark .chat-container::-webkit-scrollbar-track {
+        background: #222;
+    }
     .chat-container::-webkit-scrollbar-thumb {
         background: #888;
         border-radius: 3px;
@@ -72,6 +120,155 @@
     .chat-container::-webkit-scrollbar-thumb:hover {
         background: #555;
     }
+
+    /* Animation Keyframes */
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .animate-fadeIn {
+      animation: fadeIn 0.5s ease-out forwards;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 1; }
+    }
+    .animate-subtle-pulse {
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    .no-break-inside {
+      page-break-inside: avoid !important;
+    }
+
+    /* Professional Report Styles */
+    .report-body {
+        font-family: 'Lato', sans-serif;
+        color: #333;
+    }
+    .report-page {
+        background: white;
+        padding: 0.5in;
+        margin-bottom: 0.25in;
+        box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        position: relative;
+        min-height: 11in;
+        width: 8.5in;
+        display: flex;
+        flex-direction: column;
+    }
+    .report-cover {
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        background-color: #0A369D;
+        color: white;
+    }
+    .aes-logo-text {
+        position: absolute;
+        top: 0.5in;
+        left: 0.5in;
+        font-family: 'Lora', serif;
+        font-weight: 600;
+        font-size: 1.1rem;
+        color: #E1A11A;
+    }
+    .report-main-title {
+        font-family: 'Lora', serif;
+        font-size: 2.8rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+        border-bottom: 2px solid #E1A11A;
+        padding-bottom: 1rem;
+    }
+    .report-subtitle {
+        font-size: 1.2rem;
+        opacity: 0.9;
+        margin-top: 2rem;
+    }
+    .report-client-name {
+        font-family: 'Lora', serif;
+        font-size: 2rem;
+        font-weight: 600;
+        margin-top: 0.5rem;
+    }
+    .report-client-owner {
+      font-size: 1.2rem;
+      opacity: 0.9;
+    }
+    .report-date-footer {
+        position: absolute;
+        bottom: 0.5in;
+        text-align: center;
+        width: 100%;
+        font-size: 0.9rem;
+    }
+    .report-header, .report-footer {
+        width: 100%;
+        padding-bottom: 0.25rem;
+        margin-bottom: 0.25rem;
+        border-bottom: 1px solid #DEE2E6;
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.75rem;
+        color: #6c757d;
+        flex-shrink: 0;
+    }
+    .report-footer {
+        border-bottom: none;
+        border-top: 1px solid #DEE2E6;
+        margin-top: auto; /* Pushes footer to bottom */
+        padding-top: 0.25rem;
+        padding-bottom: 0;
+        margin-bottom: 0;
+    }
+    .report-content {
+      flex-grow: 1;
+    }
+    .report-h3 {
+      font-family: 'Lora', serif;
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: #0A369D;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.25rem;
+      border-bottom: 2px solid #E1A11A;
+    }
+    .report-p {
+        line-height: 1.6;
+        font-size: 0.9rem;
+        color: #495057;
+    }
+    .professional-table table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    .professional-table th, .professional-table td {
+      text-align: left;
+      padding: 0.6rem 0.5rem;
+      border-bottom: 1px solid #DEE2E6;
+    }
+    .professional-table td:last-child {
+      text-align: right;
+      font-family: monospace;
+    }
+    .professional-table th {
+      font-weight: bold;
+      color: #495057;
+      background-color: #F8F9FA;
+      text-transform: uppercase;
+      font-size: 0.7rem;
+    }
+    .professional-table tr:last-child td {
+      border-bottom: none;
+    }
+    .professional-table tfoot td {
+      font-weight: bold;
+      color: #333;
+      border-top: 2px solid #333;
+    }
+
   </style>
 <script type="importmap">
 {
@@ -85,12 +282,15 @@
     "xlsx": "https://esm.sh/xlsx@0.18.5",
     "file-saver": "https://esm.sh/file-saver@^2.0.5",
     "jspdf": "https://esm.sh/jspdf@^3.0.1",
-    "jspdf-autotable": "https://esm.sh/jspdf-autotable@^5.0.2"
+    "jspdf-autotable": "https://esm.sh/jspdf-autotable@^5.0.2",
+    "firebase/app": "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js",
+    "firebase/database": "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js",
+    "firebase/": "https://aistudiocdn.com/firebase@^12.1.0/"
   }
 }
 </script>
 </head>
-<body class="bg-secondary">
+<body class="bg-secondary dark:bg-dark-primary transition-colors duration-300">
   <div id="root"></div>
   <script type="module" src="./index.tsx"></script>
 </body>

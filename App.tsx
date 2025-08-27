@@ -1,12 +1,12 @@
-
-import React, { useState, useEffect, useCallback, type ChangeEvent } from 'react';
-import { AppView, TransactionType, PaymentMethod } from './constants';
-import type { Entrepreneur, Transaction, Goal } from './types';
+import React, { useState, useEffect, useCallback, type ChangeEvent, useRef } from 'react';
+import { AppView, TransactionType, PaymentMethod, USERS } from './constants';
+import type { Entrepreneur, Transaction, Goal, CurrentUser, User } from './types';
+import { Role } from './types';
 import Navbar from './components/Navbar';
 import EntrepreneurManager from './components/EntrepreneurManager';
 import TransactionManager from './components/TransactionManager';
 import ReportGenerator from './components/ReportGenerator';
-import { getEntrepreneurs, getTransactions, saveEntrepreneurs, saveTransactions } from './services/storageService';
+import { listenToEntrepreneurs, listenToTransactions, saveEntrepreneurs, saveTransactions, listenToUsers, saveUsers } from './services/storageService';
 import { parseTransactionsFromPdf } from './services/geminiService';
 import Dashboard from './components/Dashboard';
 import EntrepreneurDashboard from './components/EntrepreneurDashboard';
@@ -14,12 +14,19 @@ import GrowthHub from './components/GrowthHub';
 import LoadingSpinner from './components/LoadingSpinner';
 import * as XLSX from 'xlsx';
 import Modal from './components/ui/Modal';
-import TransactionEditForm from './components/TransactionEditForm';
+import TransactionForm from './components/TransactionForm';
 import AskAiModal from './components/AskAiModal';
 import GoalForm from './components/GoalForm';
+import FullPageLoader from './components/ui/FullPageLoader';
+import Login from './components/Login';
+import UserManagement from './components/UserManagement';
+import SecondaryNav from './components/SecondaryNav';
+import { ThemeProvider } from './contexts/ThemeContext';
 
-const App = () => {
-  const [currentView, setCurrentView] = useState<AppView>(AppView.DASHBOARD);
+const AppContent = () => {
+  const [currentView, setCurrentView] = useState<AppView>(AppView.LOGIN);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
   const [entrepreneurs, setEntrepreneurs] = useState<Entrepreneur[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [editingEntrepreneur, setEditingEntrepreneur] = useState<Entrepreneur | null>(null);
@@ -29,35 +36,89 @@ const App = () => {
   const [isAskAiModalOpen, setIsAskAiModalOpen] = useState(false);
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
   const [goalModalEntrepreneur, setGoalModalEntrepreneur] = useState<Entrepreneur | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
+  const dataLoaded = useRef({ entrepreneurs: false, transactions: false, users: false });
+
+  const checkAllDataLoaded = () => {
+    if (dataLoaded.current.entrepreneurs && dataLoaded.current.transactions && dataLoaded.current.users) {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    setEntrepreneurs(getEntrepreneurs());
-    setTransactions(getTransactions());
+    const unsubscribeUsers = listenToUsers((data) => {
+      if (data.length === 0) {
+        // First-time setup or data wipe, seed with default users
+        saveUsers(USERS);
+        setUsers(USERS);
+      } else {
+        setUsers(data);
+      }
+      dataLoaded.current.users = true;
+      checkAllDataLoaded();
+    });
+    const unsubscribeEntrepreneurs = listenToEntrepreneurs((data) => {
+        setEntrepreneurs(data);
+        dataLoaded.current.entrepreneurs = true;
+        checkAllDataLoaded();
+    });
+    const unsubscribeTransactions = listenToTransactions((data) => {
+        setTransactions(data);
+        dataLoaded.current.transactions = true;
+        checkAllDataLoaded();
+    });
+
+    return () => {
+        unsubscribeUsers();
+        unsubscribeEntrepreneurs();
+        unsubscribeTransactions();
+    };
+  }, []);
+  
+  const handleLogin = (user: CurrentUser) => {
+    setCurrentUser(user);
+    if (user.type === 'system') {
+      navigateTo(AppView.DASHBOARD);
+    } else {
+      setSelectedDashboardEntrepreneur(user.user);
+      navigateTo(AppView.ENTREPRENEUR_DASHBOARD);
+    }
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setSelectedDashboardEntrepreneur(null);
+    navigateTo(AppView.LOGIN);
+  };
+
+  const handleSetUsers = useCallback(async (updatedUsers: User[]) => {
+    setUsers(updatedUsers);
+    await saveUsers(updatedUsers);
   }, []);
 
-  const handleSetEntrepreneurs = useCallback((updatedEntrepreneurs: Entrepreneur[]) => {
+  const handleSetEntrepreneurs = useCallback(async (updatedEntrepreneurs: Entrepreneur[]) => {
     setEntrepreneurs(updatedEntrepreneurs);
-    saveEntrepreneurs(updatedEntrepreneurs);
+    await saveEntrepreneurs(updatedEntrepreneurs);
   }, []);
 
-  const handleSetTransactions = useCallback((updatedTransactions: Transaction[]) => {
+  const handleSetTransactions = useCallback(async (updatedTransactions: Transaction[]) => {
     setTransactions(updatedTransactions);
-    saveTransactions(updatedTransactions);
+    await saveTransactions(updatedTransactions);
   }, []);
 
-  const handleDeleteEntrepreneur = useCallback((id: string) => {
-    // This centralized handler ensures both entrepreneurs and their transactions are removed from the app state.
+  const handleDeleteEntrepreneur = useCallback(async (id: string) => {
     const updatedEntrepreneurs = entrepreneurs.filter(e => e.id !== id);
-    handleSetEntrepreneurs(updatedEntrepreneurs);
-
     const updatedTransactions = transactions.filter(t => t.entrepreneurId !== id);
-    handleSetTransactions(updatedTransactions);
+    await Promise.all([
+      handleSetEntrepreneurs(updatedEntrepreneurs),
+      handleSetTransactions(updatedTransactions)
+    ]);
   }, [entrepreneurs, transactions, handleSetEntrepreneurs, handleSetTransactions]);
 
 
   const navigateTo = (view: AppView) => {
-    setEditingEntrepreneur(null); // Reset editing state on navigation
+    setEditingEntrepreneur(null);
     if (view !== AppView.ENTREPRENEUR_DASHBOARD) {
         setSelectedDashboardEntrepreneur(null);
     }
@@ -82,9 +143,9 @@ const App = () => {
     setEditingTransaction(null);
   };
 
-  const handleUpdateTransaction = (updatedTransaction: Transaction) => {
+  const handleUpdateTransaction = async (updatedTransaction: Transaction) => {
     const updatedTransactions = transactions.map(t => t.id === updatedTransaction.id ? updatedTransaction : t);
-    handleSetTransactions(updatedTransactions);
+    await handleSetTransactions(updatedTransactions);
     handleCloseEditTransaction();
   };
   
@@ -98,11 +159,10 @@ const App = () => {
     setIsGoalModalOpen(false);
   };
   
-  const handleAddOrUpdateGoal = (goal: Goal) => {
+  const handleAddOrUpdateGoal = async (goal: Goal) => {
     if (!goalModalEntrepreneur) return;
     
     const updatedEntrepreneur = { ...goalModalEntrepreneur };
-    
     const existingGoals = updatedEntrepreneur.goals || [];
     const goalIndex = existingGoals.findIndex(g => g.id === goal.id);
 
@@ -114,22 +174,20 @@ const App = () => {
     updatedEntrepreneur.goals = existingGoals;
 
     const updatedEntrepreneurs = entrepreneurs.map(e => e.id === updatedEntrepreneur.id ? updatedEntrepreneur : e);
-    handleSetEntrepreneurs(updatedEntrepreneurs);
+    await handleSetEntrepreneurs(updatedEntrepreneurs);
     
-    // Also update the selected entrepreneur if they are being viewed
     if (selectedDashboardEntrepreneur?.id === updatedEntrepreneur.id) {
         setSelectedDashboardEntrepreneur(updatedEntrepreneur);
+    }
+    if (currentUser?.type === 'entrepreneur' && currentUser.user.id === updatedEntrepreneur.id) {
+        setCurrentUser({ ...currentUser, user: updatedEntrepreneur });
     }
 
     handleCloseGoalModal();
   };
 
-
   const handleDataExport = () => {
-    const data = {
-      entrepreneurs: getEntrepreneurs(),
-      transactions: getTransactions(),
-    };
+    const data = { users: users, entrepreneurs: entrepreneurs, transactions: transactions };
     const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(data, null, 2))}`;
     const link = document.createElement("a");
     link.href = jsonString;
@@ -144,13 +202,16 @@ const App = () => {
     const fileExtension = file.name.split('.').pop()?.toLowerCase();
     const reader = new FileReader();
 
-    const processJson = (fileContent: string) => {
+    const processJson = async (fileContent: string) => {
         try {
             const importedData = JSON.parse(fileContent);
             if (importedData.entrepreneurs && importedData.transactions) {
                 if (window.confirm("This will overwrite all existing data with the backup file. Are you sure you want to proceed?")) {
-                    handleSetEntrepreneurs(importedData.entrepreneurs);
-                    handleSetTransactions(importedData.transactions);
+                    await Promise.all([
+                      handleSetUsers(importedData.users || USERS), // Handle legacy backups
+                      handleSetEntrepreneurs(importedData.entrepreneurs),
+                      handleSetTransactions(importedData.transactions)
+                    ]);
                     alert("Data restored successfully!");
                     navigateTo(AppView.DASHBOARD);
                 }
@@ -162,7 +223,7 @@ const App = () => {
         }
     };
 
-    const processSheetData = (fileContent: ArrayBuffer) => {
+    const processSheetData = async (fileContent: ArrayBuffer) => {
         try {
             const workbook = XLSX.read(fileContent, { type: 'buffer', cellDates: true });
             const sheetName = workbook.SheetNames[0];
@@ -272,8 +333,10 @@ const App = () => {
 
             if (newTransactions.length > 0) {
                 if (window.confirm(confirmationMessage)) {
-                    handleSetEntrepreneurs([...entrepreneurs, ...newlyCreatedEntrepreneurs]);
-                    handleSetTransactions([...transactions, ...newTransactions]);
+                    await Promise.all([
+                      handleSetEntrepreneurs([...entrepreneurs, ...newlyCreatedEntrepreneurs]),
+                      handleSetTransactions([...transactions, ...newTransactions])
+                    ]);
                     alert(`Import complete!\n\nAdded: ${newTransactions.length} transactions.\nCreated: ${newlyCreatedEntrepreneurs.length} entrepreneurs.\nSkipped: ${skippedRows} rows.${errors.length > 0 ? ' See console for details.' : ''}`);
                 }
             } else {
@@ -362,8 +425,10 @@ const App = () => {
 
         if (newTransactions.length > 0) {
             if (window.confirm(confirmationMessage)) {
-                handleSetEntrepreneurs([...entrepreneurs, ...newlyCreatedEntrepreneurs]);
-                handleSetTransactions([...transactions, ...newTransactions]);
+                await Promise.all([
+                  handleSetEntrepreneurs([...entrepreneurs, ...newlyCreatedEntrepreneurs]),
+                  handleSetTransactions([...transactions, ...newTransactions])
+                ]);
                 alert(`PDF Import complete!\n\nAdded: ${newTransactions.length} transactions.\nCreated: ${newlyCreatedEntrepreneurs.length} entrepreneurs.\nSkipped rows: ${errors.length}.${errors.length > 0 ? ' See console for details.' : ''}`);
             }
         } else {
@@ -418,17 +483,42 @@ const App = () => {
     }
   };
 
+  // --- Data Scoping ---
+  const visibleEntrepreneurs = useCallback(() => {
+    if (currentUser?.type === 'system') {
+        if (currentUser.user.role === Role.STAFF) {
+            return entrepreneurs.filter(e => e.assignedStaffId === currentUser.user.id);
+        }
+        return entrepreneurs; // Super Admin and Admin see all
+    }
+    return []; // Entrepreneurs don't see lists of other entrepreneurs
+  }, [currentUser, entrepreneurs]);
 
-  const renderView = () => {
+  const visibleTransactions = useCallback(() => {
+    if (currentUser?.type === 'system') {
+        if (currentUser.user.role === Role.STAFF) {
+            const assignedIds = visibleEntrepreneurs().map(e => e.id);
+            return transactions.filter(t => assignedIds.includes(t.entrepreneurId));
+        }
+        return transactions; // Super Admin and Admin see all
+    }
+    return []; // Logic for entrepreneur's own transactions is handled elsewhere
+  }, [currentUser, transactions, visibleEntrepreneurs]);
+
+
+  const renderSystemUserView = () => {
+    const scopedEntrepreneurs = visibleEntrepreneurs();
+    const scopedTransactions = visibleTransactions();
+
     switch (currentView) {
       case AppView.DASHBOARD:
-        return <Dashboard entrepreneurs={entrepreneurs} transactions={transactions} navigateTo={navigateTo} />;
+        return <Dashboard entrepreneurs={scopedEntrepreneurs} transactions={scopedTransactions} />;
       case AppView.ENTREPRENEURS:
       case AppView.ADD_ENTREPRENEUR:
       case AppView.EDIT_ENTREPRENEUR:
         return (
           <EntrepreneurManager
-            entrepreneurs={entrepreneurs}
+            entrepreneurs={scopedEntrepreneurs}
             setEntrepreneurs={handleSetEntrepreneurs}
             editingEntrepreneur={editingEntrepreneur}
             setEditingEntrepreneur={setEditingEntrepreneur}
@@ -437,6 +527,8 @@ const App = () => {
             onEdit={handleEditEntrepreneur}
             onViewDashboard={handleViewDashboard}
             onDeleteEntrepreneur={handleDeleteEntrepreneur}
+            users={users}
+            currentUser={currentUser as { type: 'system', user: User }}
           />
         );
       case AppView.ENTREPRENEUR_DASHBOARD:
@@ -447,25 +539,68 @@ const App = () => {
                 navigateTo={navigateTo}
                 onEditTransaction={handleOpenEditTransaction}
                 onSetGoal={handleOpenGoalModal}
+                userRole='admin' // Represents system user
             />
         );
       case AppView.TRANSACTIONS:
         return (
           <TransactionManager
-            transactions={transactions}
+            transactions={scopedTransactions}
             setTransactions={handleSetTransactions}
-            entrepreneurs={entrepreneurs}
+            entrepreneurs={scopedEntrepreneurs}
             onEditTransaction={handleOpenEditTransaction}
           />
         );
       case AppView.REPORTS:
-        return <ReportGenerator entrepreneurs={entrepreneurs} transactions={transactions} />;
+        return <ReportGenerator entrepreneurs={scopedEntrepreneurs} transactions={scopedTransactions} />;
       case AppView.GROWTH_HUB:
-        return <GrowthHub entrepreneurs={entrepreneurs} />;
+        return <GrowthHub entrepreneurs={scopedEntrepreneurs} />;
+      case AppView.USER_MANAGEMENT:
+        return <UserManagement allUsers={users} setUsers={handleSetUsers} />;
       default:
-        return <Dashboard entrepreneurs={entrepreneurs} transactions={transactions} navigateTo={navigateTo} />;
+        return <Dashboard entrepreneurs={scopedEntrepreneurs} transactions={scopedTransactions} />;
     }
   };
+
+  const renderEntrepreneurView = () => {
+    if (currentUser?.type !== 'entrepreneur') return null;
+
+    const myTransactions = transactions.filter(t => t.entrepreneurId === currentUser.user.id);
+    const handleAddTransaction = async (newTransaction: Transaction) => {
+      await handleSetTransactions([...transactions, newTransaction]);
+    };
+
+    return (
+      <EntrepreneurDashboard
+          entrepreneur={currentUser.user}
+          transactions={myTransactions}
+          navigateTo={navigateTo}
+          onEditTransaction={handleOpenEditTransaction}
+          onSetGoal={() => handleOpenGoalModal(currentUser.user)}
+          userRole='entrepreneur'
+          onAddTransaction={handleAddTransaction}
+      />
+    );
+  };
+  
+  const renderContent = () => {
+    if (isLoading) return <FullPageLoader message="Loading AES JAC Admin Portal..." />;
+    if (!currentUser) return <Login onLogin={handleLogin} entrepreneurs={entrepreneurs} users={users} />;
+
+    if (currentUser.type === 'system') {
+      return (
+        <div className="flex-grow w-full max-w-7xl mx-auto">
+          {renderSystemUserView()}
+        </div>
+      );
+    } else {
+      return (
+         <div className="flex-grow w-full max-w-7xl mx-auto">
+          {renderEntrepreneurView()}
+        </div>
+      );
+    }
+  }
 
   return (
     <>
@@ -476,10 +611,11 @@ const App = () => {
       )}
       {editingTransaction && (
         <Modal isOpen={true} onClose={handleCloseEditTransaction} title="Edit Transaction">
-            <TransactionEditForm
-                transaction={editingTransaction}
+            <TransactionForm
+                initialData={editingTransaction}
                 onSubmit={handleUpdateTransaction}
                 onCancel={handleCloseEditTransaction}
+                entrepreneurs={visibleEntrepreneurs()}
             />
         </Modal>
       )}
@@ -487,8 +623,8 @@ const App = () => {
         <AskAiModal
           isOpen={isAskAiModalOpen}
           onClose={() => setIsAskAiModalOpen(false)}
-          entrepreneurs={entrepreneurs}
-          transactions={transactions}
+          entrepreneurs={visibleEntrepreneurs()}
+          transactions={visibleTransactions()}
         />
       )}
       {isGoalModalOpen && goalModalEntrepreneur && (
@@ -499,21 +635,42 @@ const App = () => {
             />
         </Modal>
       )}
-      <div className="min-h-screen flex flex-col bg-secondary">
-        <Navbar 
-          navigateTo={navigateTo} 
-          onExport={handleDataExport} 
-          onImport={handleDataImport}
-          onAskAi={() => setIsAskAiModalOpen(true)}
-        />
-        <main className="flex-grow p-4 md:p-8">
-          {renderView()}
-        </main>
-        <footer className="bg-primary text-white text-center p-4">
-          <p>&copy; {new Date().getFullYear()} AES JAC Admin Portal. All rights reserved.</p>
-        </footer>
-      </div>
+      
+      {currentUser ? (
+        <div className="min-h-screen flex flex-col bg-secondary dark:bg-dark-primary transition-colors duration-300">
+          <Navbar
+            currentUser={currentUser}
+            navigateTo={navigateTo}
+            onLogout={handleLogout}
+            onExport={handleDataExport}
+            onImport={handleDataImport}
+            onAskAi={() => setIsAskAiModalOpen(true)}
+          />
+           {currentUser.type === 'system' && (
+             <SecondaryNav 
+                currentView={currentView}
+                navigateTo={navigateTo}
+                currentUser={currentUser}
+             />
+          )}
+          <main className="flex-grow flex justify-center main-content">
+            {renderContent()}
+          </main>
+        </div>
+      ) : (
+        <div className="login-container bg-secondary dark:bg-dark-primary transition-colors duration-300">
+          {renderContent()}
+        </div>
+      )}
     </>
+  );
+};
+
+const App = () => {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   );
 };
 

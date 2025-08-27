@@ -131,8 +131,9 @@ export const exportToDocx = async (aiReport: AiReport, entrepreneur: Entrepreneu
                 }) : createNormalText(""),
 
                 createHeading("Action Plan"),
-                 ...aiReport.actionableRecommendations.map(rec => new Paragraph({
-                    children: [new TextRun({ text: `[${rec.priority.toUpperCase()}] `, bold: true }), new TextRun(rec.item) ],
+                // FIX: Property 'actionableRecommendations' does not exist on type 'AiReport'. It should be 'strategicRecommendations'. The item property should be 'recommendation'.
+                 ...aiReport.strategicRecommendations.map(rec => new Paragraph({
+                    children: [new TextRun({ text: `[${rec.priority.toUpperCase()}] `, bold: true }), new TextRun(rec.recommendation) ],
                     bullet: { level: 0 }
                 }))
             ]

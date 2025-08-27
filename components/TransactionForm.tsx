@@ -1,5 +1,4 @@
-
-import React, { useState, type ChangeEvent, type FormEvent } from 'react';
+import React, { useState, type ChangeEvent, type FormEvent, useEffect } from 'react';
 import type { Entrepreneur, Transaction } from '../types';
 import { TransactionType, PaymentMethod, PaidStatus } from '../constants';
 import Button from './ui/Button';
@@ -8,42 +7,118 @@ import Select from './ui/Select';
 
 interface TransactionFormProps {
   onSubmit: (transaction: Transaction) => void;
+  onCancel?: () => void;
+  initialData?: Transaction;
   entrepreneurs: Entrepreneur[];
+  currentEntrepreneur?: Entrepreneur; // For logged-in entrepreneur view
 }
 
-const TransactionForm = ({ onSubmit, entrepreneurs }: TransactionFormProps) => {
-  const initialFormState = {
-    entrepreneurId: '',
-    type: TransactionType.INCOME,
-    date: new Date().toISOString().split('T')[0],
-    description: '',
-    amount: '',
-    paymentMethod: PaymentMethod.CASH,
-    paidStatus: PaidStatus.FULL,
-    customerName: '',
-    productServiceCategory: '',
+const TransactionForm = ({ onSubmit, onCancel, initialData, entrepreneurs, currentEntrepreneur }: TransactionFormProps) => {
+  
+  const getInitialState = () => {
+    if (initialData) {
+      return { ...initialData, amount: String(initialData.amount) };
+    }
+    return {
+      entrepreneurId: currentEntrepreneur?.id || '',
+      type: TransactionType.INCOME,
+      date: new Date().toISOString().split('T')[0],
+      description: '',
+      amount: '',
+      paymentMethod: currentEntrepreneur?.preferredPaymentType || PaymentMethod.CASH,
+      paidStatus: PaidStatus.FULL,
+      customerName: '',
+      productServiceCategory: '',
+    };
   };
-  const [formData, setFormData] = useState(initialFormState);
+
+  const [formData, setFormData] = useState(getInitialState);
+  const [errors, setErrors] = useState<Partial<Record<keyof typeof formData, string>>>({});
+  const [isSuccess, setIsSuccess] = useState(false);
+
+  useEffect(() => {
+    setFormData(getInitialState());
+  }, [initialData, currentEntrepreneur]);
+
+
+  const validate = (fieldValues: Partial<typeof formData> = formData): boolean => {
+    let tempErrors: Partial<Record<keyof typeof formData, string>> = { ...errors };
+
+    const checkField = (fieldName: keyof typeof formData) => {
+        switch (fieldName) {
+            case 'entrepreneurId':
+                if (!currentEntrepreneur) { // Only validate if not pre-selected
+                  tempErrors.entrepreneurId = fieldValues.entrepreneurId ? "" : "Please select an entrepreneur.";
+                }
+                break;
+            case 'description':
+                tempErrors.description = fieldValues.description && fieldValues.description.length >= 3 ? "" : "Description must be at least 3 characters long.";
+                break;
+            case 'amount':
+                const amount = Number(fieldValues.amount);
+                if (!fieldValues.amount || isNaN(amount)) {
+                    tempErrors.amount = "A valid amount is required.";
+                } else if (amount <= 0) {
+                    tempErrors.amount = "Amount must be a positive number.";
+                } else {
+                    tempErrors.amount = "";
+                }
+                break;
+            case 'date':
+                tempErrors.date = fieldValues.date ? "" : "Transaction date is required.";
+                break;
+            default:
+                break;
+        }
+    };
+    
+    if (fieldValues === formData) {
+        Object.keys(formData).forEach(key => checkField(key as keyof typeof formData));
+    } else {
+        Object.keys(fieldValues).forEach(key => checkField(key as keyof typeof formData));
+    }
+
+    setErrors(tempErrors);
+
+    if (fieldValues === formData) {
+        return Object.values(tempErrors).every(x => x === "" || x === undefined);
+    }
+    return true;
+  };
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+     if (errors[name as keyof typeof errors]) {
+        setErrors(prev => ({ ...prev, [name]: '' }));
+    }
+  };
+  
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name } = e.target;
+    validate({ [name]: formData[name as keyof typeof formData] });
   };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!formData.entrepreneurId || !formData.description || !formData.amount) {
-        alert("Please select an entrepreneur, and fill in description and amount.");
-        return;
+    if (validate(formData)) {
+        const finalTransaction: Transaction = {
+          ...(initialData || {}),
+          ...formData,
+          id: initialData?.id || crypto.randomUUID(),
+          amount: parseFloat(formData.amount),
+          paidStatus: formData.type === TransactionType.INCOME ? formData.paidStatus : undefined,
+        };
+        
+        setIsSuccess(true);
+        setTimeout(() => {
+          onSubmit(finalTransaction);
+          if (!initialData) { // only reset if it was a new entry
+            setFormData(getInitialState());
+            setIsSuccess(false);
+          }
+        }, 1000);
     }
-    const newTransaction: Transaction = {
-      ...formData,
-      id: crypto.randomUUID(),
-      amount: parseFloat(formData.amount),
-      paidStatus: formData.type === TransactionType.INCOME ? formData.paidStatus : undefined,
-    };
-    onSubmit(newTransaction);
-    setFormData(initialFormState); // Reset form
   };
 
   const entrepreneurOptions = entrepreneurs.map(e => ({ value: e.id, label: `${e.name} (${e.businessName})` }));
@@ -51,18 +126,26 @@ const TransactionForm = ({ onSubmit, entrepreneurs }: TransactionFormProps) => {
   const paymentMethodOptions = Object.values(PaymentMethod).map(m => ({ value: m, label: m }));
   const paidStatusOptions = Object.values(PaidStatus).map(s => ({ value: s, label: s }));
 
+  const successMessage = initialData ? "Saved!" : "Success! Transaction added.";
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 bg-white p-8 rounded-lg shadow-md">
-      <h2 className="text-2xl font-semibold text-gray-800 mb-6">Add New Transaction</h2>
-      <Select
-        label="Entrepreneur"
-        id="entrepreneurId"
-        name="entrepreneurId"
-        value={formData.entrepreneurId}
-        onChange={handleChange}
-        options={entrepreneurOptions}
-        required
-      />
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <h2 className="text-2xl font-semibold text-gray-800 dark:text-dark-text mb-6">{initialData ? 'Edit Transaction' : 'Add New Transaction'}</h2>
+      
+      {!currentEntrepreneur && (
+        <Select
+          label="Entrepreneur"
+          id="entrepreneurId"
+          name="entrepreneurId"
+          value={formData.entrepreneurId}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          options={entrepreneurOptions}
+          error={errors.entrepreneurId}
+          required
+        />
+      )}
+
       <Select
         label="Transaction Type"
         id="type"
@@ -77,8 +160,10 @@ const TransactionForm = ({ onSubmit, entrepreneurs }: TransactionFormProps) => {
         id="date"
         name="date"
         type="date"
-        value={formData.date}
+        value={formData.date.split('T')[0]} // Handle potential full ISO string from initialData
         onChange={handleChange}
+        onBlur={handleBlur}
+        error={errors.date}
         required
       />
       <Input
@@ -87,6 +172,8 @@ const TransactionForm = ({ onSubmit, entrepreneurs }: TransactionFormProps) => {
         name="description"
         value={formData.description}
         onChange={handleChange}
+        onBlur={handleBlur}
+        error={errors.description}
         required
       />
       <Input
@@ -97,6 +184,8 @@ const TransactionForm = ({ onSubmit, entrepreneurs }: TransactionFormProps) => {
         step="0.01"
         value={formData.amount}
         onChange={handleChange}
+        onBlur={handleBlur}
+        error={errors.amount}
         required
       />
       <Select
@@ -113,7 +202,7 @@ const TransactionForm = ({ onSubmit, entrepreneurs }: TransactionFormProps) => {
           label="Paid Status"
           id="paidStatus"
           name="paidStatus"
-          value={formData.paidStatus}
+          value={formData.paidStatus || PaidStatus.FULL}
           onChange={handleChange}
           options={paidStatusOptions}
           required
@@ -123,18 +212,21 @@ const TransactionForm = ({ onSubmit, entrepreneurs }: TransactionFormProps) => {
         label="Customer Name (Optional)"
         id="customerName"
         name="customerName"
-        value={formData.customerName}
+        value={formData.customerName || ''}
         onChange={handleChange}
       />
       <Input
         label="Product/Service Category (Optional)"
         id="productServiceCategory"
         name="productServiceCategory"
-        value={formData.productServiceCategory}
+        value={formData.productServiceCategory || ''}
         onChange={handleChange}
       />
-      <div className="flex justify-end pt-4">
-        <Button type="submit" variant="primary">Add Transaction</Button>
+      <div className="flex justify-end items-center space-x-3 pt-4 border-t dark:border-dark-border mt-4">
+         {onCancel && <Button type="button" variant="secondary" onClick={onCancel} disabled={isSuccess}>Cancel</Button>}
+         <Button type="submit" variant={isSuccess ? "success" : "primary"} disabled={isSuccess}>
+            {isSuccess ? successMessage : (initialData ? 'Save Changes' : 'Add Transaction')}
+        </Button>
       </div>
     </form>
   );

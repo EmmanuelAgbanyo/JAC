@@ -1,5 +1,18 @@
-
 import { PaymentMethod, PaidStatus, TransactionType } from './constants';
+
+export enum Role {
+  SUPER_ADMIN = 'Super Admin',
+  ADMIN = 'Admin',
+  STAFF = 'Staff',
+}
+
+export interface User {
+  id: string;
+  username: string;
+  password?: string; // For simulation; don't store plain text in real apps
+  role: Role;
+  assignedEntrepreneurIds?: string[];
+}
 
 export interface Entrepreneur {
   id: string;
@@ -10,7 +23,13 @@ export interface Entrepreneur {
   preferredPaymentType: PaymentMethod;
   bio?: string;
   goals?: Goal[];
+  assignedStaffId?: string;
 }
+
+export type CurrentUser = 
+  | { type: 'system', user: User }
+  | { type: 'entrepreneur', user: Entrepreneur };
+
 
 export interface Transaction {
   id:string;
@@ -65,7 +84,7 @@ export interface AiReportAnalysisSection {
 }
 
 export interface AiReportActionItem {
-    item: string;
+    recommendation: string;
     priority: 'high' | 'medium' | 'low';
 }
 
@@ -147,11 +166,13 @@ export interface AiReport {
   charts?: ChartSuggestion[];
   swotAnalysis?: SwotAnalysis;
   cashFlowAnalysis?: CashFlowAnalysis;
+  varianceAnalysis?: AiReportAnalysisSection;
+  workingCapitalAnalysis?: AiReportAnalysisSection;
   salesInsights?: SalesInsights;
   futureOutlook?: FutureOutlook;
   riskAnalysis?: RiskAnalysis;
   detailedAnalysis: AiReportAnalysisSection[];
-  actionableRecommendations: AiReportActionItem[];
+  strategicRecommendations: AiReportActionItem[];
 }
 
 // --- Goal Setting ---

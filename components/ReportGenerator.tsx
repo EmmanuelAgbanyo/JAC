@@ -1,16 +1,22 @@
 
-
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import type { Entrepreneur, Transaction, AiReport } from '../types';
 import { generateAiPoweredReport } from '../services/geminiService';
 import Button from './ui/Button';
 import Select from './ui/Select';
 import LoadingSpinner from './LoadingSpinner';
 import HtmlReportView from './HtmlReportView';
+import { TransactionType } from '../constants';
 
 interface ReportGeneratorProps {
   entrepreneurs: Entrepreneur[];
   transactions: Transaction[];
+}
+
+interface TransactionSummary {
+    count: number;
+    income: number;
+    expenses: number;
 }
 
 const ReportGenerator = ({ entrepreneurs, transactions }: ReportGeneratorProps) => {
@@ -24,6 +30,7 @@ const ReportGenerator = ({ entrepreneurs, transactions }: ReportGeneratorProps) 
   const [reportContext, setReportContext] = useState<{ entrepreneur: Entrepreneur; transactions: Transaction[], period: string} | null>(null);
   const [autoGeneratePdf, setAutoGeneratePdf] = useState<boolean>(true);
   const [shouldAutoExport, setShouldAutoExport] = useState<boolean>(false);
+  const [transactionSummary, setTransactionSummary] = useState<TransactionSummary | null>(null);
 
 
   const entrepreneurOptions = entrepreneurs.map(e => ({ value: e.id, label: `${e.name} (${e.businessName})` }));
@@ -45,6 +52,24 @@ const ReportGenerator = ({ entrepreneurs, transactions }: ReportGeneratorProps) 
     }
     return Array.from(years).sort().reverse().map(y => ({value: y, label: y}));
   }, [transactions]);
+  
+  useEffect(() => {
+      const period = periodType === 'monthly' ? selectedMonth : selectedYear;
+      if (selectedEntrepreneurId && period) {
+        const relevantTransactions = transactions.filter(t => 
+            t.entrepreneurId === selectedEntrepreneurId && t.date.startsWith(period)
+        );
+        const summary: TransactionSummary = {
+            count: relevantTransactions.length,
+            income: relevantTransactions.filter(t => t.type === TransactionType.INCOME).reduce((sum, t) => sum + t.amount, 0),
+            expenses: relevantTransactions.filter(t => t.type === TransactionType.EXPENSE).reduce((sum, t) => sum + t.amount, 0),
+        };
+        setTransactionSummary(summary);
+      } else {
+        setTransactionSummary(null);
+      }
+  }, [selectedEntrepreneurId, periodType, selectedMonth, selectedYear, transactions]);
+
 
   const handleGenerateReport = useCallback(async () => {
     const period = periodType === 'monthly' ? selectedMonth : selectedYear;
@@ -68,7 +93,7 @@ const ReportGenerator = ({ entrepreneurs, transactions }: ReportGeneratorProps) 
         throw new Error("Gemini API key not configured. Strategic insights from AI are unavailable. Please configure the API_KEY environment variable.");
       }
 
-      const report = await generateAiPoweredReport(relevantTransactions, entrepreneur, period);
+      const report = await generateAiPoweredReport(relevantTransactions, entrepreneur, period, entrepreneur.goals);
       setAiReport(report);
       setReportContext({ entrepreneur, transactions: relevantTransactions, period });
 
@@ -145,6 +170,21 @@ const ReportGenerator = ({ entrepreneurs, transactions }: ReportGeneratorProps) 
             />
           )}
         </div>
+
+        {transactionSummary && (
+            <div className="my-4 p-4 bg-blue-50 border border-blue-200 rounded-md animate-fadeIn">
+                <h4 className="font-semibold text-aesBlue mb-2">Data Preview for Selected Period</h4>
+                {transactionSummary.count > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
+                        <p><span className="font-medium text-gray-600">Transactions:</span> {transactionSummary.count}</p>
+                        <p><span className="font-medium text-gray-600">Total Income:</span> <span className="text-green-600 font-semibold">GHS {transactionSummary.income.toFixed(2)}</span></p>
+                        <p><span className="font-medium text-gray-600">Total Expenses:</span> <span className="text-red-600 font-semibold">GHS {transactionSummary.expenses.toFixed(2)}</span></p>
+                    </div>
+                ) : (
+                    <p className="text-gray-600 italic text-sm">No transactions found for this period. An AI summary can still be generated based on the lack of activity.</p>
+                )}
+            </div>
+        )}
         
         <div className="border-t border-gray-200 pt-4">
             <div className="flex justify-between items-center">
