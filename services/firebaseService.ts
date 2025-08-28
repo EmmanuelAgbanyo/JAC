@@ -2,8 +2,9 @@ import { initializeApp } from "firebase/app";
 import { getDatabase } from "firebase/database";
 
 // Your web app's Firebase configuration
+// For production environments, it is recommended to set the FIREBASE_API_KEY environment variable.
 const firebaseConfig = {
-  apiKey: "AIzaSyBZULmYwn6HrLtzWudmOZmX8fxpwsEeoXw",
+  apiKey: process.env.FIREBASE_API_KEY || "AIzaSyBonBAPtVrFpaEVZk4nU1-mD3di8qbmuC4",
   authDomain: "coffee-spark-sample-app-e38fd.firebaseapp.com",
   databaseURL: "https://coffee-spark-sample-app-e38fd-default-rtdb.firebaseio.com/",
   projectId: "coffee-spark-sample-app-e38fd",
