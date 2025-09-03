@@ -1,8 +1,9 @@
 
+
 import React, { type ButtonHTMLAttributes, type ReactNode } from 'react';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'danger' | 'success' | 'warning' | 'info' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'danger' | 'success' | 'warning' | 'info' | 'ghost' | 'danger-ghost';
   size?: 'sm' | 'md' | 'lg';
   isLoading?: boolean;
   children: ReactNode;
@@ -25,7 +26,8 @@ const Button = ({
     success: 'bg-success hover:opacity-90 text-white focus:ring-success',
     warning: 'bg-warning hover:bg-warning-hover text-white focus:ring-warning',
     info: 'bg-info hover:opacity-90 text-white focus:ring-info',
-    ghost: 'bg-white/10 hover:bg-white/20 text-white focus:ring-white'
+    ghost: 'bg-white/10 hover:bg-white/20 text-white focus:ring-white',
+    'danger-ghost': 'bg-red-500/20 hover:bg-red-500/40 text-red-200 focus:ring-red-400'
   };
 
   const sizeStyles = {

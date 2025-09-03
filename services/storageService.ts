@@ -1,4 +1,4 @@
-import { ref, onValue, set, remove, type Unsubscribe } from "firebase/database";
+import { ref, onValue, set, remove, update, type Unsubscribe } from "firebase/database";
 import { db } from './firebaseService';
 import type { Entrepreneur, Transaction, User } from '../types';
 
@@ -69,3 +69,8 @@ const arrayToObject = <T extends {id: string}>(arr: T[]): {[id: string]: T} => {
 export const overwriteEntrepreneurs = (entrepreneurs: Entrepreneur[]): Promise<void> => set(entrepreneursRef, arrayToObject(entrepreneurs));
 export const overwriteTransactions = (transactions: Transaction[]): Promise<void> => set(transactionsRef, arrayToObject(transactions));
 export const overwriteUsers = (users: User[]): Promise<void> => set(usersRef, arrayToObject(users));
+
+// --- ATOMIC UPDATES ---
+export const performAtomicUpdate = (updates: Record<string, any>): Promise<void> => {
+    return update(ref(db), updates);
+};

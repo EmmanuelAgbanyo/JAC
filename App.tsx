@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useCallback, type ChangeEvent, useRef } from 'react';
 import { AppView, TransactionType, PaymentMethod, USERS } from './constants';
 import type { Entrepreneur, Transaction, Goal, CurrentUser, User, PartialTransaction } from './types';
@@ -18,7 +20,8 @@ import {
   deleteUser,
   overwriteEntrepreneurs,
   overwriteTransactions,
-  overwriteUsers
+  overwriteUsers,
+  performAtomicUpdate
 } from './services/storageService';
 import { parseTransactionsFromPdf, parseExpenseFromReceipt } from './services/geminiService';
 import Dashboard from './components/Dashboard';
@@ -35,6 +38,8 @@ import Login from './components/Login';
 import UserManagement from './components/UserManagement';
 import SecondaryNav from './components/SecondaryNav';
 import { ThemeProvider } from './contexts/ThemeContext';
+import Input from './components/ui/Input';
+import Button from './components/ui/Button';
 
 const AppContent = () => {
   const [currentView, setCurrentView] = useState<AppView>(AppView.LOGIN);
@@ -49,6 +54,8 @@ const AppContent = () => {
   const [isImporting, setIsImporting] = useState<boolean>(false);
   const [isAskAiModalOpen, setIsAskAiModalOpen] = useState(false);
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [resetConfirmationText, setResetConfirmationText] = useState('');
   const [goalModalEntrepreneur, setGoalModalEntrepreneur] = useState<Entrepreneur | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -107,11 +114,78 @@ const AppContent = () => {
   };
 
   const handleDeleteEntrepreneur = useCallback(async (id: string) => {
-    const updatedTransactions = transactions.filter(t => t.entrepreneurId !== id);
-    const deletePromises = updatedTransactions.map(t => deleteTransaction(t.id));
-    await Promise.all(deletePromises);
-    await deleteEntrepreneur(id);
-  }, [transactions]);
+    try {
+      const entrepreneurToDelete = entrepreneurs.find(e => e.id === id);
+      if (!entrepreneurToDelete) {
+          throw new Error("Entrepreneur not found.");
+      }
+      
+      // Prepare an object for an atomic, multi-path update. This ensures all
+      // related data is deleted in a single, all-or-nothing operation.
+      const updates: { [key: string]: any } = {};
+
+      // Path for entrepreneur deletion (setting to null removes it)
+      updates[`entrepreneurs/${id}`] = null;
+      
+      // Paths for all associated transaction deletions
+      transactions
+        .filter(transaction => transaction.entrepreneurId === id)
+        .forEach(transaction => {
+            updates[`transactions/${transaction.id}`] = null;
+        });
+
+      // Path to update staff user's assignments for data consistency
+      if (entrepreneurToDelete.assignedStaffId) {
+        const staffUser = users.find(u => u.id === entrepreneurToDelete.assignedStaffId);
+        if (staffUser?.assignedEntrepreneurIds?.includes(id)) {
+          const newAssignedIds = staffUser.assignedEntrepreneurIds.filter(eId => eId !== id);
+          updates[`users/${staffUser.id}/assignedEntrepreneurIds`] = newAssignedIds;
+        }
+      }
+      
+      // Execute the atomic update operation
+      await performAtomicUpdate(updates);
+      
+      alert(`Successfully deleted ${entrepreneurToDelete.name}.`);
+
+    } catch (error) {
+      console.error("Failed to delete entrepreneur and their transactions:", error);
+      alert("An error occurred while trying to delete the entrepreneur. Please check the console for more details.");
+    }
+  }, [entrepreneurs, transactions, users]);
+  
+   const handleResetData = useCallback(async () => {
+    if (resetConfirmationText !== 'DELETE') {
+        alert("Confirmation text does not match. Reset cancelled.");
+        return;
+    }
+    
+    try {
+        setIsLoading(true);
+        setIsResetModalOpen(false);
+
+        const updates: { [key: string]: any } = {};
+        updates['entrepreneurs'] = null;
+        updates['transactions'] = null;
+
+        users.forEach(user => {
+            if (user.role === Role.STAFF && user.assignedEntrepreneurIds?.length) {
+                updates[`users/${user.id}/assignedEntrepreneurIds`] = null;
+            }
+        });
+
+        await performAtomicUpdate(updates);
+        
+        alert("All entrepreneur and transaction data has been successfully deleted.");
+    } catch (error)
+    {
+        console.error("Failed to reset data:", error);
+        alert("An error occurred while trying to reset the data.");
+    } finally {
+        setIsLoading(false);
+        setResetConfirmationText('');
+    }
+  }, [users, resetConfirmationText]);
 
 
   const navigateTo = (view: AppView) => {
@@ -646,6 +720,35 @@ const AppContent = () => {
             />
         </Modal>
       )}
+       {isResetModalOpen && (
+        <Modal isOpen={true} onClose={() => { setIsResetModalOpen(false); setResetConfirmationText(''); }} title="Confirm Data Reset">
+            <div className="space-y-4">
+                <p className="text-sm text-gray-700 dark:text-dark-textSecondary">
+                    This is a highly destructive action that will <strong className="text-danger">permanently delete ALL entrepreneur profiles and ALL associated transactions</strong>. This cannot be undone.
+                </p>
+                <p className="text-sm text-gray-700 dark:text-dark-textSecondary">
+                    All staff assignments will also be cleared. User accounts will NOT be deleted.
+                </p>
+                <Input
+                    label="To confirm, please type 'DELETE' in the box below."
+                    id="reset-confirmation"
+                    value={resetConfirmationText}
+                    onChange={(e) => setResetConfirmationText(e.target.value)}
+                    placeholder="DELETE"
+                />
+                <div className="flex justify-end space-x-3 pt-4 border-t dark:border-dark-border">
+                    <Button variant="secondary" onClick={() => { setIsResetModalOpen(false); setResetConfirmationText(''); }}>Cancel</Button>
+                    <Button
+                        variant="danger"
+                        onClick={handleResetData}
+                        disabled={resetConfirmationText !== 'DELETE'}
+                    >
+                        Delete All Data
+                    </Button>
+                </div>
+            </div>
+        </Modal>
+      )}
       
       {currentUser ? (
         <div className="min-h-screen flex flex-col bg-secondary dark:bg-dark-primary transition-colors duration-300">
@@ -656,6 +759,7 @@ const AppContent = () => {
             onExport={handleDataExport}
             onImport={handleDataImport}
             onAskAi={() => setIsAskAiModalOpen(true)}
+            onResetData={() => setIsResetModalOpen(true)}
           />
            {currentUser.type === 'system' && (
              <SecondaryNav 

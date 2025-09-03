@@ -1,4 +1,4 @@
-import React, { useState, type ChangeEvent, type FormEvent, useEffect } from 'react';
+import React, { useState, type ChangeEvent, type FormEvent, useEffect, useRef } from 'react';
 import type { Entrepreneur, Transaction, PartialTransaction } from '../types';
 import { TransactionType, PaymentMethod, PaidStatus } from '../constants';
 import Button from './ui/Button';
@@ -14,6 +14,7 @@ interface TransactionFormProps {
 }
 
 const TransactionForm = ({ onSubmit, onCancel, initialData, entrepreneurs, currentEntrepreneur }: TransactionFormProps) => {
+  const lastSubmittedType = useRef<TransactionType>(TransactionType.INCOME);
   
   const getInitialState = () => {
     if (initialData) {
@@ -33,7 +34,7 @@ const TransactionForm = ({ onSubmit, onCancel, initialData, entrepreneurs, curre
     }
     return {
       entrepreneurId: currentEntrepreneur?.id || '',
-      type: TransactionType.INCOME,
+      type: lastSubmittedType.current, // Default to the last used type for new entries
       date: new Date().toISOString().split('T')[0],
       description: '',
       amount: '',
@@ -119,8 +120,18 @@ const TransactionForm = ({ onSubmit, onCancel, initialData, entrepreneurs, curre
           ...formData,
           id: (initialData && 'id' in initialData) ? initialData.id! : crypto.randomUUID(),
           amount: parseFloat(formData.amount),
-          paidStatus: formData.type === TransactionType.INCOME ? formData.paidStatus : undefined,
         } as Transaction;
+
+        // For expenses, paidStatus is not applicable.
+        // It must be deleted to prevent sending `undefined` to Firebase, which causes an error.
+        if (finalTransaction.type === TransactionType.EXPENSE) {
+          delete (finalTransaction as Partial<Transaction>).paidStatus;
+        }
+        
+        // If it's a new entry, remember its type for the next reset
+        if (!(initialData && 'id' in initialData)) {
+            lastSubmittedType.current = finalTransaction.type;
+        }
         
         setIsSuccess(true);
         setTimeout(() => {

@@ -12,9 +12,10 @@ interface NavbarProps {
   onExport: () => void;
   onImport: (event: ChangeEvent<HTMLInputElement>) => void;
   onAskAi: () => void;
+  onResetData: () => void;
 }
 
-const Navbar = ({ currentUser, navigateTo, onLogout, onExport, onImport, onAskAi }: NavbarProps) => {
+const Navbar = ({ currentUser, navigateTo, onLogout, onExport, onImport, onAskAi, onResetData }: NavbarProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -31,6 +32,8 @@ const Navbar = ({ currentUser, navigateTo, onLogout, onExport, onImport, onAskAi
   
   const canImportExport = currentUser.type === 'system' && [Role.SUPER_ADMIN, Role.ADMIN, Role.STAFF].includes(currentUser.user.role);
   const canAskAi = currentUser.type === 'system' && [Role.SUPER_ADMIN, Role.ADMIN, Role.STAFF].includes(currentUser.user.role);
+  const isSuperAdmin = currentUser.type === 'system' && currentUser.user.role === Role.SUPER_ADMIN;
+
 
   const renderNavLinks = () => (
     <div className="flex flex-col md:flex-row items-stretch md:items-center md:space-x-4">
@@ -65,6 +68,12 @@ const Navbar = ({ currentUser, navigateTo, onLogout, onExport, onImport, onAskAi
             <input type="file" ref={fileInputRef} className="hidden" accept=".json,.csv,.xlsx,.xls,.pdf" onChange={onImport} />
           </div>
         </>
+      )}
+
+      {isSuperAdmin && (
+         <div className="px-3 py-2">
+           <Button variant="danger-ghost" size="sm" onClick={() => { onResetData(); setIsMobileMenuOpen(false); }} className="w-full">Reset Data</Button>
+         </div>
       )}
       
       <div className="px-3 py-2 border-t border-white/20 md:border-0 md:p-0">
